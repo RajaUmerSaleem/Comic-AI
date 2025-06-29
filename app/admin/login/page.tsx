@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/components/auth-provider"
 import { apiRequest } from "@/lib/api"
 import { Shield, Mail, Lock } from "lucide-react"
 
@@ -22,7 +21,6 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,13 +32,14 @@ export default function AdminLoginPage() {
         body: JSON.stringify(formData),
       })
 
-      // For admin, we might not have a separate profile endpoint, so we'll use the login response
-      login(response.access_token, { email: formData.email, role: "admin" })
-      toast({
-        title: "Success",
-        description: "Admin login successful",
-      })
-      router.push("/admin/dashboard")
+      if (response.access_token) {
+        localStorage.setItem("admin_access_token", response.access_token)
+        toast({
+          title: "Success",
+          description: "Admin login successful!",
+        })
+        router.push("/admin/dashboard")
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -67,7 +66,7 @@ export default function AdminLoginPage() {
             <Shield className="h-6 w-6 text-blue-600" />
           </div>
           <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
-          <CardDescription>Sign in to your admin dashboard</CardDescription>
+          <CardDescription>Access the Vibrant Comic AI admin panel</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -104,7 +103,7 @@ export default function AdminLoginPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

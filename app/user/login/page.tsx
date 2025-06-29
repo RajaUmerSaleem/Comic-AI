@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/components/auth-provider"
 import { apiRequest } from "@/lib/api"
 import { BookOpen, Mail, Lock } from "lucide-react"
 
@@ -22,7 +21,6 @@ export default function UserLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,15 +32,14 @@ export default function UserLoginPage() {
         body: JSON.stringify(formData),
       })
 
-      // Get user profile
-      const userProfile = await apiRequest("/v1/auth/profile", {}, response.access_token)
-
-      login(response.access_token, userProfile)
-      toast({
-        title: "Success",
-        description: "Login successful",
-      })
-      router.push("/user/dashboard")
+      if (response.access_token) {
+        localStorage.setItem("access_token", response.access_token)
+        toast({
+          title: "Success",
+          description: "Login successful!",
+        })
+        router.push("/user/dashboard")
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -106,13 +103,13 @@ export default function UserLoginPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
             {"Don't have an account? "}
             <Link href="/user/register" className="text-purple-600 hover:underline">
-              Register here
+              Sign up here
             </Link>
           </div>
         </CardContent>

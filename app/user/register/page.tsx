@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
 import { BookOpen, User, Mail, Lock } from "lucide-react"
@@ -20,6 +21,8 @@ export default function UserRegisterPage() {
     password: "",
     first_name: "",
     last_name: "",
+    role: "uploader",
+    business_id: 1, // Auto-generated default business ID
   })
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -141,6 +144,21 @@ export default function UserRegisterPage() {
                   required
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="uploader">Uploader</SelectItem>
+                  <SelectItem value="translator">Translator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating Account..." : "Create Account"}

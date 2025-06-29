@@ -37,7 +37,7 @@ export default function AdminRegisterPage() {
 
       toast({
         title: "Success",
-        description: "Admin registration successful. You can now login.",
+        description: "Admin registration successful!",
       })
       router.push("/admin/login")
     } catch (error: any) {
@@ -66,7 +66,7 @@ export default function AdminRegisterPage() {
             <Shield className="h-6 w-6 text-blue-600" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Admin Account</CardTitle>
-          <CardDescription>Register as an administrator</CardDescription>
+          <CardDescription>Register as an administrator for Vibrant Comic AI</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
