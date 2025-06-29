@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { apiRequest } from "@/lib/api"
+import { apiRequest, uploadFont } from "@/lib/api"
 import { Type, Upload, Download, Trash2, Edit, FileText } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -62,7 +62,7 @@ export function FontManagement() {
     }
   }
 
-  const uploadFont = async () => {
+  const handleUploadFont = async () => {
     if (!selectedFile || !fontName.trim()) {
       toast({
         title: "Error",
@@ -74,20 +74,7 @@ export function FontManagement() {
 
     setIsUploading(true)
     try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-
-      const response = await fetch(`http://54.91.239.105/v1/fonts/?name=${encodeURIComponent(fontName)}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        throw new Error("Upload failed")
-      }
+      await uploadFont(fontName, selectedFile, token!)
 
       toast({
         title: "Success",
@@ -214,7 +201,11 @@ export function FontManagement() {
               />
               <p className="text-xs text-muted-foreground mt-1">Supported formats: TTF, OTF, PIL</p>
             </div>
-            <Button onClick={uploadFont} disabled={!selectedFile || !fontName.trim() || isUploading} className="w-full">
+            <Button
+              onClick={handleUploadFont}
+              disabled={!selectedFile || !fontName.trim() || isUploading}
+              className="w-full"
+            >
               {isUploading ? (
                 <>
                   <Upload className="mr-2 h-4 w-4 animate-spin" />

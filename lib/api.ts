@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://54.91.239.105"
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://vibrant.productizetech.com"
 
 export class ApiError extends Error {
   constructor(
@@ -65,6 +65,30 @@ export async function uploadFile(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new ApiError(response.status, errorData.detail || errorData.message || "Upload failed")
+  }
+
+  return response.json()
+}
+
+export async function uploadFont(fontName: string, file: File, token?: string) {
+  const url = `${BASE_URL}/v1/fonts/?name=${encodeURIComponent(fontName)}`
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const headers: HeadersInit = {}
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new ApiError(response.status, errorData.detail || errorData.message || "Font upload failed")
   }
 
   return response.json()

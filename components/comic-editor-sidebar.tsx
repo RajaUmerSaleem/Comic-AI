@@ -1,16 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { Eye, RefreshCw, Plus, Edit, Trash2, Save, Wand2 } from "lucide-react"
+import { Eye, EyeOff, RefreshCw, Plus, Edit, Trash2, Save, Zap, MessageSquare } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -62,121 +61,41 @@ export function ComicEditorSidebar({
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [selectedBubble, setSelectedBubble] = useState<SpeechBubble | null>(null)
-  const [editingBubble, setEditingBubble] = useState<Partial<SpeechBubble> | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null)
+  const [bubbleText, setBubbleText] = useState("")
+  const [bubbleTranslation, setBubbleTranslation] = useState("")
+  const [newBubbleData, setNewBubbleData] = useState({
+    page_id: 0,
+    bubble_no: 0,
+    coordinates_xyxy: [0, 0, 0, 0],
+    mask_coordinates_xyxy: [[0, 0]],
+    text: "",
+    translation: "",
+  })
   const { toast } = useToast()
 
   const selectedPage = pages.find((p) => p.page_id === selectedPageId)
 
-  const updateBubbleTranslation = async (bubbleId: number, translation: string) => {
-    if (!selectedPageId) return
+  useEffect(() => {
+    if (editingBubble) {
+      setBubbleText(editingBubble.text)
+      setBubbleTranslation(editingBubble.translation)
+    }
+  }, [editingBubble])
+
+  const updateBubble = async () => {
+    if (!editingBubble) return
 
     try {
       await apiRequest(
-        `/v1/pages/${selectedPageId}/bubble/${bubbleId}/translation`,
+        `/v1/pages/bubble/${editingBubble.id}`,
         {
           method: "PUT",
           body: JSON.stringify({
-            page_id: selectedPageId,
-            bubble_data: [
-              {
-                bubble_id: bubbleId,
-                translation,
-                font_size: 12,
-                font_color: [0, 0, 0],
-              },
-            ],
-          }),
-        },
-        token!,
-      )
-
-      toast({
-        title: "Success",
-        description: "Translation updated successfully",
-      })
-      onPagesUpdate()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-  const updateBubbleText = async (bubbleId: number, text: string) => {
-    if (!selectedPageId) return
-
-    try {
-      await apiRequest(
-        `/v1/pages/${selectedPageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
-        {
-          method: "PUT",
-        },
-        token!,
-      )
-
-      toast({
-        title: "Success",
-        description: "Text updated successfully",
-      })
-      onPagesUpdate()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-  const createBubble = async (bubbleData: Partial<SpeechBubble>) => {
-    if (!selectedPageId) return
-
-    try {
-      await apiRequest(
-        "/v1/pages/bubble",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            page_id: selectedPageId,
-            bubble_no: bubbleData.bubble_no || 1,
-            coordinates_xyxy: bubbleData.coordinates_xyxy || [0, 0, 100, 100],
-            mask_coordinates_xyxy: bubbleData.mask_coordinates_xyxy || [[0, 0]],
-            text: bubbleData.text || "",
-            translation: bubbleData.translation || "",
-          }),
-        },
-        token!,
-      )
-
-      toast({
-        title: "Success",
-        description: "Speech bubble created successfully",
-      })
-      onPagesUpdate()
-      setEditingBubble(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-  const updateBubble = async (bubbleId: number, bubbleData: Partial<SpeechBubble>) => {
-    try {
-      await apiRequest(
-        `/v1/pages/bubble/${bubbleId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            coordinates_xyxy: bubbleData.coordinates_xyxy,
-            mask_coordinates_xyxy: bubbleData.mask_coordinates_xyxy,
-            text: bubbleData.text,
-            translation: bubbleData.translation,
+            coordinates_xyxy: editingBubble.coordinates_xyxy,
+            mask_coordinates_xyxy: editingBubble.mask_coordinates_xyxy,
+            text: bubbleText,
+            translation: bubbleTranslation,
           }),
         },
         token!,
@@ -186,8 +105,50 @@ export function ComicEditorSidebar({
         title: "Success",
         description: "Speech bubble updated successfully",
       })
-      onPagesUpdate()
+
       setEditingBubble(null)
+      setBubbleText("")
+      setBubbleTranslation("")
+      onPagesUpdate()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const createBubble = async () => {
+    if (!selectedPageId) return
+
+    try {
+      await apiRequest(
+        "/v1/pages/bubble",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ...newBubbleData,
+            page_id: selectedPageId,
+          }),
+        },
+        token!,
+      )
+
+      toast({
+        title: "Success",
+        description: "Speech bubble created successfully",
+      })
+
+      setNewBubbleData({
+        page_id: 0,
+        bubble_no: 0,
+        coordinates_xyxy: [0, 0, 0, 0],
+        mask_coordinates_xyxy: [[0, 0]],
+        text: "",
+        translation: "",
+      })
+      onPagesUpdate()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -211,6 +172,43 @@ export function ComicEditorSidebar({
         title: "Success",
         description: "Speech bubble deleted successfully",
       })
+
+      onPagesUpdate()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateBubbleTranslation = async (pageId: number, bubbleId: number, translation: string) => {
+    try {
+      await apiRequest(
+        `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            page_id: pageId,
+            bubble_data: [
+              {
+                bubble_id: bubbleId,
+                translation: translation,
+                font_size: 12,
+                font_color: [0, 0, 0],
+              },
+            ],
+          }),
+        },
+        token!,
+      )
+
+      toast({
+        title: "Success",
+        description: "Translation updated successfully",
+      })
+
       onPagesUpdate()
     } catch (error: any) {
       toast({
@@ -231,17 +229,16 @@ export function ComicEditorSidebar({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Wand2 className="mr-2 h-4 w-4" />
-            Processing
+            <Zap className="mr-2 h-4 w-4" />
+            Processing Controls
           </CardTitle>
-          <CardDescription>Process the selected file or page</CardDescription>
+          <CardDescription>Generate detection and remove text from speech bubbles</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           <Button
             onClick={() => onDetectionStart()}
             disabled={!selectedFileId || isProcessing("detect")}
             className="w-full"
-            size="sm"
           >
             {isProcessing("detect") ? (
               <>
@@ -262,7 +259,6 @@ export function ComicEditorSidebar({
               disabled={isProcessing("detect")}
               variant="outline"
               className="w-full"
-              size="sm"
             >
               {isProcessing("detect") ? (
                 <>
@@ -272,7 +268,7 @@ export function ComicEditorSidebar({
               ) : (
                 <>
                   <Eye className="mr-2 h-4 w-4" />
-                  Detect This Page
+                  Detect Current Page
                 </>
               )}
             </Button>
@@ -282,17 +278,16 @@ export function ComicEditorSidebar({
             onClick={() => onTextRemovalStart()}
             disabled={!selectedFileId || isProcessing("remove")}
             className="w-full"
-            size="sm"
           >
             {isProcessing("remove") ? (
               <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Removing...
+                Removing Text...
               </>
             ) : (
               <>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Remove Text All
+                <EyeOff className="mr-2 h-4 w-4" />
+                Remove Text All Pages
               </>
             )}
           </Button>
@@ -303,17 +298,16 @@ export function ComicEditorSidebar({
               disabled={isProcessing("remove")}
               variant="outline"
               className="w-full"
-              size="sm"
             >
               {isProcessing("remove") ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
+                  Removing Text...
                 </>
               ) : (
                 <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove Text This Page
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Remove Text Current Page
                 </>
               )}
             </Button>
@@ -324,135 +318,123 @@ export function ComicEditorSidebar({
       {selectedPage && (
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Page {selectedPage.page_number}</CardTitle>
-                <CardDescription>Speech bubbles ({selectedPage.speech_bubbles.length})</CardDescription>
-              </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm" onClick={() => setEditingBubble({})}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Speech Bubble</DialogTitle>
-                    <DialogDescription>Create a new speech bubble for this page</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="bubble-text">Text</Label>
-                      <Textarea
-                        id="bubble-text"
-                        value={editingBubble?.text || ""}
-                        onChange={(e) => setEditingBubble((prev) => ({ ...prev, text: e.target.value }))}
-                        placeholder="Enter the detected text"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bubble-translation">Translation</Label>
-                      <Textarea
-                        id="bubble-translation"
-                        value={editingBubble?.translation || ""}
-                        onChange={(e) => setEditingBubble((prev) => ({ ...prev, translation: e.target.value }))}
-                        placeholder="Enter the translation"
-                      />
-                    </div>
-                    <Button onClick={() => createBubble(editingBubble!)} className="w-full">
-                      Create Bubble
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+            <CardTitle className="flex items-center">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Speech Bubbles
+            </CardTitle>
+            <CardDescription>
+              Page {selectedPage.page_number} - {selectedPage.speech_bubbles.length} bubbles
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-64">
+            <ScrollArea className="h-96">
               <div className="space-y-3">
-                {selectedPage.speech_bubbles.map((bubble) => (
-                  <div key={bubble.id} className="border rounded-lg p-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Badge variant="outline">Bubble #{bubble.bubble_no}</Badge>
-                      <div className="flex gap-1">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" onClick={() => setEditingBubble(bubble)}>
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Speech Bubble</DialogTitle>
-                              <DialogDescription>Update the speech bubble content</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="edit-bubble-text">Text</Label>
-                                <Textarea
-                                  id="edit-bubble-text"
-                                  value={editingBubble?.text || ""}
-                                  onChange={(e) => setEditingBubble((prev) => ({ ...prev, text: e.target.value }))}
-                                  placeholder="Enter the detected text"
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="edit-bubble-translation">Translation</Label>
-                                <Textarea
-                                  id="edit-bubble-translation"
-                                  value={editingBubble?.translation || ""}
-                                  onChange={(e) =>
-                                    setEditingBubble((prev) => ({ ...prev, translation: e.target.value }))
-                                  }
-                                  placeholder="Enter the translation"
-                                />
-                              </div>
-                              <Button onClick={() => updateBubble(bubble.id, editingBubble!)} className="w-full">
-                                Update Bubble
+                {selectedPage.speech_bubbles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No speech bubbles detected. Run detection first.
+                  </p>
+                ) : (
+                  selectedPage.speech_bubbles.map((bubble) => (
+                    <div key={bubble.id} className="border rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="secondary">Bubble #{bubble.bubble_no}</Badge>
+                        <div className="flex gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" onClick={() => setEditingBubble(bubble)}>
+                                <Edit className="h-3 w-3" />
                               </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        <Button size="sm" variant="outline" onClick={() => deleteBubble(bubble.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Original Text</Label>
-                        <p className="text-sm">{bubble.text || "No text detected"}</p>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Translation</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={bubble.translation}
-                            onChange={(e) => {
-                              const newTranslation = e.target.value
-                              // Update locally for immediate feedback
-                              setSelectedBubble({ ...bubble, translation: newTranslation })
-                            }}
-                            placeholder="Enter translation"
-                            className="text-sm"
-                          />
-                          <Button size="sm" onClick={() => updateBubbleTranslation(bubble.id, bubble.translation)}>
-                            <Save className="h-3 w-3" />
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit Speech Bubble</DialogTitle>
+                                <DialogDescription>
+                                  Update the text and translation for this speech bubble
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <Label htmlFor="bubble-text">Original Text</Label>
+                                  <Textarea
+                                    id="bubble-text"
+                                    value={bubbleText}
+                                    onChange={(e) => setBubbleText(e.target.value)}
+                                    placeholder="Enter original text"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="bubble-translation">Translation</Label>
+                                  <Textarea
+                                    id="bubble-translation"
+                                    value={bubbleTranslation}
+                                    onChange={(e) => setBubbleTranslation(e.target.value)}
+                                    placeholder="Enter translation"
+                                  />
+                                </div>
+                                <Button onClick={updateBubble} className="w-full">
+                                  <Save className="mr-2 h-4 w-4" />
+                                  Save Changes
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <Button variant="outline" size="sm" onClick={() => deleteBubble(bubble.id)}>
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Original:</p>
+                          <p className="text-sm">{bubble.text || "No text detected"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Translation:</p>
+                          <p className="text-sm">{bubble.translation || "No translation"}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-
-                {selectedPage.speech_bubbles.length === 0 && (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <p className="text-sm">No speech bubbles detected</p>
-                    <p className="text-xs">Run detection to find speech bubbles</p>
-                  </div>
+                  ))
                 )}
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Speech Bubble
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Speech Bubble</DialogTitle>
+                      <DialogDescription>Add a new speech bubble to this page</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="new-bubble-text">Text</Label>
+                        <Textarea
+                          id="new-bubble-text"
+                          value={newBubbleData.text}
+                          onChange={(e) => setNewBubbleData((prev) => ({ ...prev, text: e.target.value }))}
+                          placeholder="Enter text"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-bubble-translation">Translation</Label>
+                        <Textarea
+                          id="new-bubble-translation"
+                          value={newBubbleData.translation}
+                          onChange={(e) => setNewBubbleData((prev) => ({ ...prev, translation: e.target.value }))}
+                          placeholder="Enter translation"
+                        />
+                      </div>
+                      <Button onClick={createBubble} className="w-full">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Bubble
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </ScrollArea>
           </CardContent>

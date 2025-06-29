@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || "https://54.91.239.105",
-  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -10,8 +7,29 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['54.91.239.105', 'vibrant-comic-ai.s3.amazonaws.com'],
+    domains: [
+      'vibrant.productizetech.com',
+      'vibrant-comic-ai.s3.amazonaws.com',
+      'placeholder.svg'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'vibrant.productizetech.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'vibrant-comic-ai.s3.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      }
+    ],
     unoptimized: true,
+  },
+  env: {
+    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   },
 }
 

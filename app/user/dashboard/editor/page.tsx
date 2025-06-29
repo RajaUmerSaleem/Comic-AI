@@ -57,7 +57,6 @@ export default function EditorPage() {
   ])
   const [isLoading, setIsLoading] = useState(true)
   const [processingTasks, setProcessingTasks] = useState<Map<string, string>>(new Map())
-  const [selectedBubble, setSelectedBubble] = useState<SpeechBubble | null>(null)
   const [selectedPageId, setSelectedPageId] = useState<number | null>(null)
   const { toast } = useToast()
 
