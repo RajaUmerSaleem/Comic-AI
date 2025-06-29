@@ -37,7 +37,7 @@ export default function AdminRegisterPage() {
 
       toast({
         title: "Success",
-        description: "Admin registration successful. Please login.",
+        description: "Admin registration successful. You can now login.",
       })
       router.push("/admin/login")
     } catch (error: any) {
@@ -65,8 +65,8 @@ export default function AdminRegisterPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
             <Shield className="h-6 w-6 text-blue-600" />
           </div>
-          <CardTitle className="text-2xl font-bold">Admin Registration</CardTitle>
-          <CardDescription>Create your admin account to manage the platform</CardDescription>
+          <CardTitle className="text-2xl font-bold">Create Admin Account</CardTitle>
+          <CardDescription>Register as an administrator</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -101,7 +101,7 @@ export default function AdminRegisterPage() {
                 <Input
                   id="username"
                   name="username"
-                  placeholder="johndoe"
+                  placeholder="admin_user"
                   value={formData.username}
                   onChange={handleChange}
                   className="pl-10"
@@ -142,7 +142,7 @@ export default function AdminRegisterPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isLoading ? "Creating Account..." : "Create Admin Account"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

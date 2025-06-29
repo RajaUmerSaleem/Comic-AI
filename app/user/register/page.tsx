@@ -2,22 +2,16 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
 import { BookOpen, User, Mail, Lock } from "lucide-react"
-
-interface Business {
-  id: number
-  name: string
-}
 
 export default function UserRegisterPage() {
   const [formData, setFormData] = useState({
@@ -26,41 +20,13 @@ export default function UserRegisterPage() {
     password: "",
     first_name: "",
     last_name: "",
-    business_id: 0,
-    role: "uploader",
   })
-  const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchBusinesses()
-  }, [])
-
-  const fetchBusinesses = async () => {
-    try {
-      const response = await apiRequest("/v1/business/")
-      setBusinesses(response.businesses)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load businesses",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.business_id === 0) {
-      toast({
-        title: "Error",
-        description: "Please select a business",
-        variant: "destructive",
-      })
-      return
-    }
 
     setIsLoading(true)
 
@@ -175,39 +141,6 @@ export default function UserRegisterPage() {
                   required
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="business">Business</Label>
-              <Select
-                value={formData.business_id.toString()}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, business_id: Number.parseInt(value) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a business" />
-                </SelectTrigger>
-                <SelectContent>
-                  {businesses.map((business) => (
-                    <SelectItem key={business.id} value={business.id.toString()}>
-                      {business.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="uploader">Uploader</SelectItem>
-                  <SelectItem value="translator">Translator</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating Account..." : "Create Account"}

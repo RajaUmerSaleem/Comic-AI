@@ -15,8 +15,10 @@ import { apiRequest } from "@/lib/api"
 import { BookOpen, Mail, Lock } from "lucide-react"
 
 export default function UserLoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -29,7 +31,7 @@ export default function UserLoginPage() {
     try {
       const response = await apiRequest("/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(formData),
       })
 
       // Get user profile
@@ -52,6 +54,13 @@ export default function UserLoginPage() {
     }
   }
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }))
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4">
       <Card className="w-full max-w-md">
@@ -70,10 +79,11 @@ export default function UserLoginPage() {
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="user@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleChange}
                   className="pl-10"
                   required
                 />
@@ -85,10 +95,11 @@ export default function UserLoginPage() {
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={handleChange}
                   className="pl-10"
                   required
                 />
