@@ -30,14 +30,14 @@ export default function AdminRegisterPage() {
     setIsLoading(true)
 
     try {
-      await apiRequest("/v1/admin/auth/register", {
+      await apiRequest("/v1/admin/register", {
         method: "POST",
         body: JSON.stringify(formData),
       })
 
       toast({
         title: "Success",
-        description: "Admin registration successful!",
+        description: "Admin registration successful! You can now login.",
       })
       router.push("/admin/login")
     } catch (error: any) {

@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth-provider"
 import { apiRequest } from "@/lib/api"
-import { BookOpen, Mail, Lock } from "lucide-react"
+import { LogIn, Mail, Lock } from "lucide-react"
 
 export default function UserLoginPage() {
   const [formData, setFormData] = useState({
@@ -21,6 +22,7 @@ export default function UserLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +35,10 @@ export default function UserLoginPage() {
       })
 
       if (response.access_token) {
-        localStorage.setItem("access_token", response.access_token)
+        // Get user profile after successful login
+        const profile = await apiRequest("/v1/auth/profile", {}, response.access_token)
+        login(response.access_token, profile)
+
         toast({
           title: "Success",
           description: "Login successful!",
@@ -43,7 +48,7 @@ export default function UserLoginPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Login failed. Please check your credentials.",
         variant: "destructive",
       })
     } finally {
@@ -63,7 +68,7 @@ export default function UserLoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
-            <BookOpen className="h-6 w-6 text-purple-600" />
+            <LogIn className="h-6 w-6 text-purple-600" />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription>Sign in to your Vibrant Comic AI account</CardDescription>
@@ -78,7 +83,7 @@ export default function UserLoginPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="user@example.com"
+                  placeholder="john@example.com"
                   value={formData.email}
                   onChange={handleChange}
                   className="pl-10"
@@ -109,7 +114,7 @@ export default function UserLoginPage() {
           <div className="mt-4 text-center text-sm">
             {"Don't have an account? "}
             <Link href="/user/register" className="text-purple-600 hover:underline">
-              Sign up here
+              Create one here
             </Link>
           </div>
         </CardContent>

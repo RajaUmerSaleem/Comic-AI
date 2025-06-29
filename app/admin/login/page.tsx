@@ -27,13 +27,13 @@ export default function AdminLoginPage() {
     setIsLoading(true)
 
     try {
-      const response = await apiRequest("/v1/admin/auth/login", {
+      const response = await apiRequest("/v1/admin/login", {
         method: "POST",
         body: JSON.stringify(formData),
       })
 
       if (response.access_token) {
-        localStorage.setItem("admin_access_token", response.access_token)
+        localStorage.setItem("adminToken", response.access_token)
         toast({
           title: "Success",
           description: "Admin login successful!",

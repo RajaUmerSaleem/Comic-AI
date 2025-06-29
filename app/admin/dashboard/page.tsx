@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { Building2, Users, Plus, Edit, Trash2, UserCheck, UserX, RefreshCw } from "lucide-react"
+import { Building2, Users, Plus, Edit, Trash2, UserCheck, UserX, RefreshCw, LogOut } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -246,6 +246,7 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground">Manage businesses and users</p>
           </div>
           <Button onClick={logout} variant="outline">
+            <LogOut className="h-4 w-4 mr-2" />
             Logout
           </Button>
         </div>

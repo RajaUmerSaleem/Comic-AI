@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { BookOpen, User, Mail, Lock } from "lucide-react"
+import { UserPlus, User, Mail, Lock, Briefcase } from "lucide-react"
 
 export default function UserRegisterPage() {
   const [formData, setFormData] = useState({
@@ -22,7 +22,7 @@ export default function UserRegisterPage() {
     first_name: "",
     last_name: "",
     role: "uploader",
-    business_id: 1, // Auto-generated default business ID
+    business_id: 1, // Auto-generated business ID
   })
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -30,18 +30,17 @@ export default function UserRegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     setIsLoading(true)
 
     try {
-      await apiRequest("/v1/auth/register", {
+      const response = await apiRequest("/v1/auth/register", {
         method: "POST",
         body: JSON.stringify(formData),
       })
 
       toast({
         title: "Success",
-        description: "Registration successful. Please wait for admin activation.",
+        description: "Registration successful! Please wait for admin activation.",
       })
       router.push("/user/login")
     } catch (error: any) {
@@ -62,15 +61,22 @@ export default function UserRegisterPage() {
     }))
   }
 
+  const handleRoleChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      role: value,
+    }))
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
-            <BookOpen className="h-6 w-6 text-purple-600" />
+            <UserPlus className="h-6 w-6 text-purple-600" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Join Vibrant Comic AI to start translating comics</CardDescription>
+          <CardDescription>Join Vibrant Comic AI platform</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -121,7 +127,7 @@ export default function UserRegisterPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="user@example.com"
+                  placeholder="john@example.com"
                   value={formData.email}
                   onChange={handleChange}
                   className="pl-10"
@@ -147,12 +153,12 @@ export default function UserRegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
-              >
+              <Select value={formData.role} onValueChange={handleRoleChange}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <div className="flex items-center">
+                    <Briefcase className="mr-2 h-4 w-4 text-gray-400" />
+                    <SelectValue placeholder="Select your role" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="uploader">Uploader</SelectItem>
