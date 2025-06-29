@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://vibrant.productizetech.com"
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://54.91.239.105"
 
 export class ApiError extends Error {
   constructor(
