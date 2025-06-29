@@ -63,31 +63,58 @@ export default function AdminDashboard() {
   const [editBusinessName, setEditBusinessName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [adminUser, setAdminUser] = useState<any>(null)
   const router = useRouter()
   const { toast } = useToast()
 
   useEffect(() => {
     const token = localStorage.getItem("adminToken")
+    const user = localStorage.getItem("adminUser")
+
+    console.log("Admin token:", token)
+    console.log("Admin user:", user)
+
     if (!token) {
       router.push("/admin/login")
       return
     }
+
+    if (user) {
+      try {
+        setAdminUser(JSON.parse(user))
+      } catch (e) {
+        console.error("Error parsing admin user:", e)
+      }
+    }
+
     fetchBusinesses()
   }, [router])
 
   const fetchBusinesses = async () => {
     try {
       const token = localStorage.getItem("adminToken")
-      const response: BusinessResponse = await apiRequest("/v1/business/", {}, token!)
-      setBusinesses(response.businesses)
+      console.log("Fetching businesses with token:", token)
+
+      const response: BusinessResponse = await apiRequest(
+        "/v1/business/",
+        {
+          method: "GET",
+        },
+        token!,
+      )
+
+      console.log("Businesses response:", response)
+      setBusinesses(response.businesses || [])
     } catch (error: any) {
+      console.error("Fetch businesses error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to fetch businesses",
         variant: "destructive",
       })
-      if (error.status === 401) {
+      if (error.status === 401 || error.status === 403) {
         localStorage.removeItem("adminToken")
+        localStorage.removeItem("adminUser")
         router.push("/admin/login")
       }
     } finally {
@@ -108,7 +135,10 @@ export default function AdminDashboard() {
     setIsCreating(true)
     try {
       const token = localStorage.getItem("adminToken")
-      await apiRequest(
+      console.log("Creating business with token:", token)
+      console.log("Business name:", newBusinessName)
+
+      const response = await apiRequest(
         "/v1/business/",
         {
           method: "POST",
@@ -117,6 +147,8 @@ export default function AdminDashboard() {
         token!,
       )
 
+      console.log("Create business response:", response)
+
       toast({
         title: "Success",
         description: "Business created successfully",
@@ -124,11 +156,19 @@ export default function AdminDashboard() {
       setNewBusinessName("")
       fetchBusinesses()
     } catch (error: any) {
+      console.error("Create business error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create business",
         variant: "destructive",
       })
+
+      // If it's an auth error, redirect to login
+      if (error.status === 401 || error.status === 403) {
+        localStorage.removeItem("adminToken")
+        localStorage.removeItem("adminUser")
+        router.push("/admin/login")
+      }
     } finally {
       setIsCreating(false)
     }
@@ -140,7 +180,7 @@ export default function AdminDashboard() {
     setIsUpdating(true)
     try {
       const token = localStorage.getItem("adminToken")
-      await apiRequest(
+      const response = await apiRequest(
         `/v1/business/${editingBusiness.id}`,
         {
           method: "PUT",
@@ -148,6 +188,8 @@ export default function AdminDashboard() {
         },
         token!,
       )
+
+      console.log("Update business response:", response)
 
       toast({
         title: "Success",
@@ -157,9 +199,10 @@ export default function AdminDashboard() {
       setEditBusinessName("")
       fetchBusinesses()
     } catch (error: any) {
+      console.error("Update business error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update business",
         variant: "destructive",
       })
     } finally {
@@ -170,7 +213,7 @@ export default function AdminDashboard() {
   const deleteBusiness = async (businessId: number) => {
     try {
       const token = localStorage.getItem("adminToken")
-      await apiRequest(
+      const response = await apiRequest(
         `/v1/business/${businessId}`,
         {
           method: "DELETE",
@@ -178,15 +221,18 @@ export default function AdminDashboard() {
         token!,
       )
 
+      console.log("Delete business response:", response)
+
       toast({
         title: "Success",
         description: "Business deleted successfully",
       })
       fetchBusinesses()
     } catch (error: any) {
+      console.error("Delete business error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to delete business",
         variant: "destructive",
       })
     }
@@ -195,7 +241,7 @@ export default function AdminDashboard() {
   const toggleUserActivation = async (userId: number, isActivated: boolean) => {
     try {
       const token = localStorage.getItem("adminToken")
-      await apiRequest(
+      const response = await apiRequest(
         "/v1/business/user/activate",
         {
           method: "PUT",
@@ -207,15 +253,18 @@ export default function AdminDashboard() {
         token!,
       )
 
+      console.log("Toggle user activation response:", response)
+
       toast({
         title: "Success",
         description: `User ${!isActivated ? "activated" : "deactivated"} successfully`,
       })
       fetchBusinesses()
     } catch (error: any) {
+      console.error("Toggle user activation error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update user status",
         variant: "destructive",
       })
     }
@@ -223,6 +272,7 @@ export default function AdminDashboard() {
 
   const logout = () => {
     localStorage.removeItem("adminToken")
+    localStorage.removeItem("adminUser")
     router.push("/admin/login")
   }
 
@@ -243,7 +293,14 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage businesses and users</p>
+            <p className="text-muted-foreground">
+              Manage businesses and users
+              {adminUser && (
+                <span className="ml-2 text-sm">
+                  • Logged in as: {adminUser.first_name} {adminUser.last_name} ({adminUser.email})
+                </span>
+              )}
+            </p>
           </div>
           <Button onClick={logout} variant="outline">
             <LogOut className="h-4 w-4 mr-2" />
@@ -269,6 +326,11 @@ export default function AdminDashboard() {
                     value={newBusinessName}
                     onChange={(e) => setNewBusinessName(e.target.value)}
                     placeholder="Enter business name"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        createBusiness()
+                      }
+                    }}
                   />
                 </div>
                 <div className="flex items-end">
@@ -302,7 +364,7 @@ export default function AdminDashboard() {
               {businesses.length === 0 ? (
                 <div className="text-center py-8">
                   <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No businesses found.</p>
+                  <p className="text-muted-foreground">No businesses found. Create your first business above.</p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -312,7 +374,7 @@ export default function AdminDashboard() {
                         <div>
                           <h3 className="text-xl font-semibold">{business.name}</h3>
                           <p className="text-sm text-muted-foreground">
-                            Created: {new Date(business.created_at).toLocaleDateString()}
+                            ID: {business.id} • Created: {new Date(business.created_at).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="flex gap-2">
@@ -380,9 +442,9 @@ export default function AdminDashboard() {
                       <div>
                         <h4 className="font-medium mb-3 flex items-center">
                           <Users className="mr-2 h-4 w-4" />
-                          Users ({business.users.length})
+                          Users ({business.users?.length || 0})
                         </h4>
-                        {business.users.length === 0 ? (
+                        {!business.users || business.users.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No users in this business.</p>
                         ) : (
                           <Table>

@@ -1,15 +1,15 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useAuth } from "@/components/auth-provider"
+import type React from "react"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, uploadFont } from "@/lib/api"
-import { Type, Upload, Download, Trash2, Edit, FileText } from "lucide-react"
+import { Type, Upload, Trash2, Edit, RefreshCw } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -19,20 +19,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Font {
   id: number
   name: string
-  file_url: string
-  file_name: string
+  file_path: string
   file_size: number
-  mime_type: string
   created_at: string
   updated_at: string
 }
 
+interface FontsResponse {
+  fonts: Font[]
+  total: number
+}
+
 export function FontManagement() {
-  const { token } = useAuth()
   const [fonts, setFonts] = useState<Font[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
@@ -40,7 +53,7 @@ export function FontManagement() {
   const [fontName, setFontName] = useState("")
   const [editingFont, setEditingFont] = useState<Font | null>(null)
   const [editFontName, setEditFontName] = useState("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -49,12 +62,13 @@ export function FontManagement() {
 
   const fetchFonts = async () => {
     try {
-      const response = await apiRequest("/v1/fonts/", {}, token!)
-      setFonts(response)
+      const token = localStorage.getItem("userToken")
+      const response: FontsResponse = await apiRequest("/v1/fonts/", {}, token!)
+      setFonts(response.fonts || [])
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to fetch fonts",
         variant: "destructive",
       })
     } finally {
@@ -62,7 +76,17 @@ export function FontManagement() {
     }
   }
 
-  const handleUploadFont = async () => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      // Auto-fill font name from filename (without extension)
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+      setFontName(nameWithoutExt)
+    }
+  }
+
+  const handleUpload = async () => {
     if (!selectedFile || !fontName.trim()) {
       toast({
         title: "Error",
@@ -74,23 +98,24 @@ export function FontManagement() {
 
     setIsUploading(true)
     try {
-      await uploadFont(fontName, selectedFile, token!)
+      const token = localStorage.getItem("userToken")
+      const response = await uploadFont(fontName, selectedFile, token!)
 
       toast({
         title: "Success",
         description: "Font uploaded successfully",
       })
-
       setSelectedFile(null)
       setFontName("")
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
+      // Reset the file input
+      const fileInput = document.getElementById("font-upload") as HTMLInputElement
+      if (fileInput) fileInput.value = ""
+
       fetchFonts()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to upload font",
         variant: "destructive",
       })
     } finally {
@@ -101,11 +126,14 @@ export function FontManagement() {
   const updateFont = async () => {
     if (!editingFont || !editFontName.trim()) return
 
+    setIsUpdating(true)
     try {
-      await apiRequest(
-        `/v1/fonts/${editingFont.id}?name=${encodeURIComponent(editFontName)}`,
+      const token = localStorage.getItem("userToken")
+      const response = await apiRequest(
+        `/v1/fonts/${editingFont.id}`,
         {
           method: "PUT",
+          body: JSON.stringify({ name: editFontName }),
         },
         token!,
       )
@@ -114,21 +142,23 @@ export function FontManagement() {
         title: "Success",
         description: "Font updated successfully",
       })
-
       setEditingFont(null)
       setEditFontName("")
       fetchFonts()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update font",
         variant: "destructive",
       })
+    } finally {
+      setIsUpdating(false)
     }
   }
 
   const deleteFont = async (fontId: number) => {
     try {
+      const token = localStorage.getItem("userToken")
       await apiRequest(
         `/v1/fonts/${fontId}`,
         {
@@ -145,7 +175,7 @@ export function FontManagement() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to delete font",
         variant: "destructive",
       })
     }
@@ -161,23 +191,24 @@ export function FontManagement() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-32">
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p>Loading fonts...</p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Type className="mr-2 h-4 w-4" />
-            Font Management
+            <Upload className="mr-2 h-5 w-5" />
+            Upload New Font
           </CardTitle>
-          <CardDescription>Upload and manage fonts for comic translation</CardDescription>
+          <CardDescription>Upload TTF, OTF, or WOFF font files</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -191,24 +222,24 @@ export function FontManagement() {
               />
             </div>
             <div>
-              <Label htmlFor="font-file">Font File</Label>
+              <Label htmlFor="font-upload">Select Font File</Label>
               <Input
-                ref={fileInputRef}
-                id="font-file"
+                id="font-upload"
                 type="file"
-                accept=".ttf,.otf,.pil"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                accept=".ttf,.otf,.woff,.woff2"
+                onChange={handleFileSelect}
+                className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground mt-1">Supported formats: TTF, OTF, PIL</p>
+              {selectedFile && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                </p>
+              )}
             </div>
-            <Button
-              onClick={handleUploadFont}
-              disabled={!selectedFile || !fontName.trim() || isUploading}
-              className="w-full"
-            >
+            <Button onClick={handleUpload} disabled={isUploading || !selectedFile || !fontName.trim()}>
               {isUploading ? (
                 <>
-                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   Uploading...
                 </>
               ) : (
@@ -224,22 +255,24 @@ export function FontManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Available Fonts</CardTitle>
+          <CardTitle className="flex items-center">
+            <Type className="mr-2 h-5 w-5" />
+            Your Fonts ({fonts.length})
+          </CardTitle>
           <CardDescription>Manage your uploaded fonts</CardDescription>
         </CardHeader>
         <CardContent>
           {fonts.length === 0 ? (
             <div className="text-center py-8">
               <Type className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No fonts uploaded yet.</p>
+              <p className="text-muted-foreground">No fonts uploaded yet. Upload your first font above.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead>Size</TableHead>
+                  <TableHead>Font Name</TableHead>
+                  <TableHead>File Size</TableHead>
                   <TableHead>Uploaded</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -248,23 +281,13 @@ export function FontManagement() {
                 {fonts.map((font) => (
                   <TableRow key={font.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Type className="h-4 w-4" />
-                        <span className="font-medium">{font.name}</span>
-                      </div>
+                      <div className="font-medium">{font.name}</div>
+                      <div className="text-sm text-muted-foreground">ID: {font.id}</div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span className="text-sm">{font.file_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{formatFileSize(font.file_size)}</Badge>
-                    </TableCell>
+                    <TableCell>{formatFileSize(font.file_size)}</TableCell>
                     <TableCell>{new Date(font.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex gap-2">
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
@@ -293,18 +316,36 @@ export function FontManagement() {
                                   placeholder="Enter font name"
                                 />
                               </div>
-                              <Button onClick={updateFont} className="w-full">
-                                Update Font
+                              <Button onClick={updateFont} disabled={isUpdating} className="w-full">
+                                {isUpdating ? "Updating..." : "Update Font"}
                               </Button>
                             </div>
                           </DialogContent>
                         </Dialog>
-                        <Button variant="outline" size="sm" onClick={() => window.open(font.file_url, "_blank")}>
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => deleteFont(font.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Font</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{font.name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteFont(font.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

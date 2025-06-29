@@ -1,96 +1,120 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useAuth } from "@/components/auth-provider"
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, uploadFile } from "@/lib/api"
-import { Upload, FileText, Download, Trash2, RefreshCw, ImageIcon, Clock, CheckCircle } from "lucide-react"
+import { FileText, Upload, Trash2, Download, Eye, RefreshCw } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Progress } from "@/components/ui/progress"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
-interface FileData {
+interface FileItem {
   id: number
-  file_url: string
-  detected_file_url: string | null
-  text_removed_file_url: string | null
-  text_translated_file_url: string | null
+  filename: string
+  file_path: string
+  file_size: number
+  file_type: string
   status: string
   created_at: string
   updated_at: string
-  user_id: number
-  business_id: number
 }
 
-interface TaskStatus {
-  status: string
-  result: any
-  task_id: string
+interface FilesResponse {
+  files: FileItem[]
+  total: number
 }
 
 export default function FilesPage() {
-  const { token } = useAuth()
-  const [files, setFiles] = useState<FileData[]>([])
+  const [files, setFiles] = useState<FileItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [processingTasks, setProcessingTasks] = useState<Map<number, string>>(new Map())
-  const [taskProgress, setTaskProgress] = useState<Map<string, TaskStatus>>(new Map())
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
   const { toast } = useToast()
 
   useEffect(() => {
+    const token = localStorage.getItem("userToken")
+    if (!token) {
+      router.push("/user/login")
+      return
+    }
     fetchFiles()
-  }, [])
-
-  useEffect(() => {
-    // Poll task statuses
-    const interval = setInterval(() => {
-      processingTasks.forEach((taskId, fileId) => {
-        pollTaskStatus(taskId, fileId)
-      })
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [processingTasks])
+  }, [router])
 
   const fetchFiles = async () => {
     try {
-      const response = await apiRequest("/v1/file/", {}, token!)
-      setFiles(response.files)
+      const token = localStorage.getItem("userToken")
+      const response: FilesResponse = await apiRequest("/v1/file/", {}, token!)
+      setFiles(response.files || [])
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to fetch files",
         variant: "destructive",
       })
+      if (error.status === 401) {
+        localStorage.removeItem("userToken")
+        localStorage.removeItem("userProfile")
+        router.push("/user/login")
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleFileUpload = async () => {
-    if (!selectedFile) return
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast({
+        title: "Error",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsUploading(true)
     try {
+      const token = localStorage.getItem("userToken")
       const response = await uploadFile("/v1/file/", selectedFile, token!)
+
       toast({
         title: "Success",
         description: "File uploaded successfully",
       })
       setSelectedFile(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
+      // Reset the file input
+      const fileInput = document.getElementById("file-upload") as HTMLInputElement
+      if (fileInput) fileInput.value = ""
+
       fetchFiles()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to upload file",
         variant: "destructive",
       })
     } finally {
@@ -98,67 +122,9 @@ export default function FilesPage() {
     }
   }
 
-  const convertToImages = async (fileId: number) => {
-    try {
-      const response = await apiRequest(
-        `/v1/file/async-images-from-pdf?file_id=${fileId}`,
-        {
-          method: "POST",
-        },
-        token!,
-      )
-
-      const newProcessingTasks = new Map(processingTasks)
-      newProcessingTasks.set(fileId, response.task_id)
-      setProcessingTasks(newProcessingTasks)
-
-      toast({
-        title: "Processing Started",
-        description: "Converting PDF to images...",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-  const pollTaskStatus = async (taskId: string, fileId: number) => {
-    try {
-      const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token!)
-
-      const newTaskProgress = new Map(taskProgress)
-      newTaskProgress.set(taskId, response)
-      setTaskProgress(newTaskProgress)
-
-      if (response.status === "SUCCESS" || response.status === "FAILED") {
-        const newProcessingTasks = new Map(processingTasks)
-        newProcessingTasks.delete(fileId)
-        setProcessingTasks(newProcessingTasks)
-
-        if (response.status === "SUCCESS") {
-          toast({
-            title: "Success",
-            description: "PDF converted to images successfully",
-          })
-          fetchFiles()
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to convert PDF to images",
-            variant: "destructive",
-          })
-        }
-      }
-    } catch (error: any) {
-      console.error("Error polling task status:", error)
-    }
-  }
-
   const deleteFile = async (fileId: number) => {
     try {
+      const token = localStorage.getItem("userToken")
       await apiRequest(
         `/v1/file/${fileId}`,
         {
@@ -175,64 +141,36 @@ export default function FilesPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to delete file",
         variant: "destructive",
       })
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      uploaded: { variant: "secondary" as const, icon: Upload },
-      detected: { variant: "default" as const, icon: CheckCircle },
-      text_removed: { variant: "default" as const, icon: CheckCircle },
-      translated: { variant: "default" as const, icon: CheckCircle },
-      completed: { variant: "default" as const, icon: CheckCircle },
-      delivered: { variant: "default" as const, icon: CheckCircle },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, icon: Clock }
-    const Icon = config.icon
-
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {status}
-      </Badge>
-    )
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const getTaskProgress = (fileId: number) => {
-    const taskId = processingTasks.get(fileId)
-    if (!taskId) return null
-
-    const progress = taskProgress.get(taskId)
-    if (!progress) return null
-
-    if (progress.result && typeof progress.result === "object" && "done" in progress.result) {
-      const percentage = (progress.result.done / progress.result.total) * 100
-      return (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span className="text-sm">{progress.status}</span>
-          </div>
-          <Progress value={percentage} className="w-full" />
-        </div>
-      )
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return "default"
+      case "processing":
+        return "secondary"
+      case "failed":
+        return "destructive"
+      default:
+        return "outline"
     }
-
-    return (
-      <div className="flex items-center gap-2">
-        <RefreshCw className="h-4 w-4 animate-spin" />
-        <span className="text-sm">{progress.status}</span>
-      </div>
-    )
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p>Loading files...</p>
@@ -244,8 +182,8 @@ export default function FilesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">File Management</h1>
-        <p className="text-muted-foreground">Upload and manage your comic PDF files for translation.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Files</h1>
+        <p className="text-muted-foreground">Upload and manage your comic files</p>
       </div>
 
       <Card>
@@ -254,19 +192,26 @@ export default function FilesPage() {
             <Upload className="mr-2 h-5 w-5" />
             Upload New File
           </CardTitle>
-          <CardDescription>Upload a PDF file to start the comic translation process.</CardDescription>
+          <CardDescription>Upload PDF files to start working with comics</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
+              <Label htmlFor="file-upload">Select File</Label>
               <Input
-                ref={fileInputRef}
+                id="file-upload"
                 type="file"
-                accept=".pdf"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileSelect}
+                className="cursor-pointer"
               />
+              {selectedFile && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                </p>
+              )}
             </div>
-            <Button onClick={handleFileUpload} disabled={!selectedFile || isUploading} className="w-full sm:w-auto">
+            <Button onClick={handleUpload} disabled={isUploading || !selectedFile}>
               {isUploading ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -287,24 +232,25 @@ export default function FilesPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="mr-2 h-5 w-5" />
-            Your Files
+            Your Files ({files.length})
           </CardTitle>
-          <CardDescription>Manage your uploaded comic files and track their processing status.</CardDescription>
+          <CardDescription>Manage your uploaded files</CardDescription>
         </CardHeader>
         <CardContent>
           {files.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No files uploaded yet.</p>
+              <p className="text-muted-foreground">No files uploaded yet. Upload your first file above.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>File</TableHead>
+                  <TableHead>Filename</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Uploaded</TableHead>
-                  <TableHead>Progress</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -312,30 +258,49 @@ export default function FilesPage() {
                 {files.map((file) => (
                   <TableRow key={file.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span className="font-medium">File #{file.id}</span>
-                      </div>
+                      <div className="font-medium">{file.filename}</div>
+                      <div className="text-sm text-muted-foreground">ID: {file.id}</div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(file.status)}</TableCell>
-                    <TableCell>{new Date(file.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>{getTaskProgress(file.id) || "-"}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => convertToImages(file.id)}
-                          disabled={processingTasks.has(file.id)}
-                        >
-                          <ImageIcon className="h-4 w-4" />
+                      <Badge variant="outline">{file.file_type}</Badge>
+                    </TableCell>
+                    <TableCell>{formatFileSize(file.file_size)}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(file.status)}>{file.status}</Badge>
+                    </TableCell>
+                    <TableCell>{new Date(file.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => window.open(file.file_url, "_blank")}>
+                        <Button variant="outline" size="sm">
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => deleteFile(file.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete File</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{file.filename}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteFile(file.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

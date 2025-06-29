@@ -32,18 +32,25 @@ export default function AdminLoginPage() {
         body: JSON.stringify(formData),
       })
 
+      console.log("Admin login response:", response)
+
       if (response.access_token) {
         localStorage.setItem("adminToken", response.access_token)
+        localStorage.setItem("adminUser", JSON.stringify(response.user || {}))
+
         toast({
           title: "Success",
           description: "Admin login successful!",
         })
         router.push("/admin/dashboard")
+      } else {
+        throw new Error("No access token received")
       }
     } catch (error: any) {
+      console.error("Admin login error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Login failed",
         variant: "destructive",
       })
     } finally {

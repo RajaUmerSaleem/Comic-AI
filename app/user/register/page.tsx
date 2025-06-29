@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { UserPlus, User, Mail, Lock, Briefcase } from "lucide-react"
+import { UserPlus, Mail, Lock, User, Building } from "lucide-react"
 
 export default function UserRegisterPage() {
   const [formData, setFormData] = useState({
@@ -21,8 +21,8 @@ export default function UserRegisterPage() {
     password: "",
     first_name: "",
     last_name: "",
-    role: "uploader",
-    business_id: 1, // Auto-generated business ID
+    role: "",
+    business_id: 1, // Auto-generated business_id set to 1
   })
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -40,7 +40,7 @@ export default function UserRegisterPage() {
 
       toast({
         title: "Success",
-        description: "Registration successful! Please wait for admin activation.",
+        description: "Account created successfully! Please login.",
       })
       router.push("/user/login")
     } catch (error: any) {
@@ -76,32 +76,42 @@ export default function UserRegisterPage() {
             <UserPlus className="h-6 w-6 text-purple-600" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Join Vibrant Comic AI platform</CardDescription>
+          <CardDescription>Join Vibrant Comic AI and start creating</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name</Label>
-                <Input
-                  id="first_name"
-                  name="first_name"
-                  placeholder="John"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  required
-                />
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="first_name"
+                    name="first_name"
+                    type="text"
+                    placeholder="John"
+                    value={formData.first_name}
+                    onChange={handleChange}
+                    className="pl-10"
+                    required
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  name="last_name"
-                  placeholder="Doe"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  required
-                />
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="last_name"
+                    name="last_name"
+                    type="text"
+                    placeholder="Doe"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                    className="pl-10"
+                    required
+                  />
+                </div>
               </div>
             </div>
             <div className="space-y-2">
@@ -111,6 +121,7 @@ export default function UserRegisterPage() {
                 <Input
                   id="username"
                   name="username"
+                  type="text"
                   placeholder="johndoe"
                   value={formData.username}
                   onChange={handleChange}
@@ -153,18 +164,32 @@ export default function UserRegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={formData.role} onValueChange={handleRoleChange}>
+              <Select onValueChange={handleRoleChange} required>
                 <SelectTrigger>
-                  <div className="flex items-center">
-                    <Briefcase className="mr-2 h-4 w-4 text-gray-400" />
-                    <SelectValue placeholder="Select your role" />
-                  </div>
+                  <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="uploader">Uploader</SelectItem>
-                  <SelectItem value="translator">Translator</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="business_id">Business ID</Label>
+              <div className="relative">
+                <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="business_id"
+                  name="business_id"
+                  type="number"
+                  value={formData.business_id}
+                  className="pl-10 bg-gray-50"
+                  disabled
+                  readOnly
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Auto-assigned business ID</p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating Account..." : "Create Account"}

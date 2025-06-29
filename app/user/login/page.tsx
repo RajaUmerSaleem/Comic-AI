@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/components/auth-provider"
 import { apiRequest } from "@/lib/api"
 import { LogIn, Mail, Lock } from "lucide-react"
 
@@ -22,7 +21,6 @@ export default function UserLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,9 +33,15 @@ export default function UserLoginPage() {
       })
 
       if (response.access_token) {
-        // Get user profile after successful login
-        const profile = await apiRequest("/v1/auth/profile", {}, response.access_token)
-        login(response.access_token, profile)
+        localStorage.setItem("userToken", response.access_token)
+
+        // Fetch user profile after login
+        try {
+          const profileResponse = await apiRequest("/v1/auth/profile", {}, response.access_token)
+          localStorage.setItem("userProfile", JSON.stringify(profileResponse))
+        } catch (profileError) {
+          console.error("Failed to fetch user profile:", profileError)
+        }
 
         toast({
           title: "Success",
@@ -48,7 +52,7 @@ export default function UserLoginPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Login failed. Please check your credentials.",
+        description: error.message,
         variant: "destructive",
       })
     } finally {
