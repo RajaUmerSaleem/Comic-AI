@@ -311,8 +311,6 @@ export default function FilesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Filename</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Uploaded</TableHead>
                   <TableHead>Actions</TableHead>
@@ -322,19 +320,11 @@ export default function FilesPage() {
                 {files.map((file) => (
                   <TableRow key={file.id}>
                     <TableCell>
-                      <div className="font-medium">
-                        {file.filename || "Unnamed"}
-                      </div>
+                      <div className="font-medium">{file.filename}</div>
                       <div className="text-sm text-muted-foreground">
                         ID: {file.id}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {file.file_type || "Unknown"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatFileSize(file.file_size || 0)}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(file.status)}>
                         {file.status || "Unknown"}
@@ -375,9 +365,8 @@ export default function FilesPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete File</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete "
-                                {file.filename || "Unnamed"}"? This action
-                                cannot be undone.
+                                Are you sure you want to delete "{file.filename}
+                                "? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
