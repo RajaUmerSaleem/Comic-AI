@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import { usePathname } from "next/navigation" // Added for pathname
+import { usePathname } from "next/navigation" 
 import {
   Sidebar,
   SidebarContent,
@@ -46,7 +46,7 @@ const menuItems = [
 export function AppSidebar() {
   const { user, logout } = useAuth()
   const router = useRouter()
-  const pathname = usePathname() // Use usePathname instead of router.pathname
+  const pathname = usePathname() 
 
   const handleLogout = () => {
     logout()
