@@ -22,7 +22,7 @@ export default function UserRegisterPage() {
     first_name: "",
     last_name: "",
     role: "",
-    business_id: 1, // Auto-generated business_id set to 1
+    business_id: "", 
   })
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -184,12 +184,12 @@ export default function UserRegisterPage() {
                   name="business_id"
                   type="number"
                   value={formData.business_id}
-                  className="pl-10 bg-gray-50"
-                  disabled
-                  readOnly
+                  placeholder="123..."
+                  onChange={handleChange}
+                  required
+                  className="pl-10"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Auto-assigned business ID</p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating Account..." : "Create Account"}
