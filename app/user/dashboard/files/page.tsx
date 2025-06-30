@@ -23,6 +23,7 @@ import {
   Download,
   Eye,
   RefreshCw,
+  Image, // Added Image icon for Convert button
 } from "lucide-react";
 import {
   Table,
@@ -82,7 +83,7 @@ export default function FilesPage() {
     try {
       const token = localStorage.getItem("userToken");
       const response: FilesResponse = await apiRequest("/v1/file/", {}, token!);
-      console.log("API Response:", response); // Debug: Log the full response
+      console.log("API Response:", response);
       setFiles(response.files || []);
     } catch (error: any) {
       toast({
@@ -121,7 +122,7 @@ export default function FilesPage() {
     try {
       const token = localStorage.getItem("userToken");
       const response = await uploadFile("/v1/file/", selectedFile, token!);
-      console.log("Upload Response:", response); // Debug: Log the upload response
+      console.log("Upload Response:", response);
 
       toast({
         title: "Success",
@@ -164,6 +165,36 @@ export default function FilesPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const convertFile = async (fileId: number, filename: string) => {
+    try {
+      const token = localStorage.getItem("userToken");
+      const response = await apiRequest(
+        `/v1/file/async-images-from-pdf?file_id=${fileId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+        },
+        token!
+        
+      );
+
+
+      toast({
+        title: "Success",
+        description: `Image extraction started for "${filename}"`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to initiate image extraction",
         variant: "destructive",
       });
     }
@@ -358,6 +389,33 @@ export default function FilesPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="outline" size="sm">
+                              <Image className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Convert File to Images
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to extract images from "
+                                {file.filename}"? This action will start the
+                                image extraction process.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => convertFile(file.id, file.filename)}
+                              >
+                                Convert
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -373,7 +431,7 @@ export default function FilesPage() {
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => deleteFile(file.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/-brain90"
                               >
                                 Delete
                               </AlertDialogAction>
