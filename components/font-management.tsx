@@ -80,7 +80,6 @@ export function FontManagement() {
     const file = e.target.files?.[0]
     if (file) {
       setSelectedFile(file)
-      // Auto-fill font name from filename (without extension)
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
       setFontName(nameWithoutExt)
     }
@@ -107,7 +106,6 @@ export function FontManagement() {
       })
       setSelectedFile(null)
       setFontName("")
-      // Reset the file input
       const fileInput = document.getElementById("font-upload") as HTMLInputElement
       if (fileInput) fileInput.value = ""
 

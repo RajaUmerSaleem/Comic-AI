@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
+import { usePathname } from "next/navigation" // Added for pathname
 import {
   Sidebar,
   SidebarContent,
@@ -45,6 +46,7 @@ const menuItems = [
 export function AppSidebar() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname() // Use usePathname instead of router.pathname
 
   const handleLogout = () => {
     logout()
@@ -79,7 +81,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className={pathname === item.url ? "bg-accent text-accent-foreground" : ""}>
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>

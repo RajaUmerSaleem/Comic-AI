@@ -1,18 +1,37 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
-import { apiRequest, uploadFile } from "@/lib/api"
-import { FileText, Upload, Trash2, Download, Eye, RefreshCw } from "lucide-react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, uploadFile } from "@/lib/api";
+import {
+  FileText,
+  Upload,
+  Trash2,
+  Download,
+  Eye,
+  RefreshCw,
+} from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,68 +42,70 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 
 interface FileItem {
-  id: number
-  filename: string
-  file_path: string
-  file_size: number
-  file_type: string
-  status: string
-  created_at: string
-  updated_at: string
+  file_url: string;
+  id: number;
+  filename: string;
+  file_path: string;
+  file_size: number;
+  file_type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface FilesResponse {
-  files: FileItem[]
-  total: number
+  files: FileItem[];
+  total: number;
 }
 
 export default function FilesPage() {
-  const [files, setFiles] = useState<FileItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isUploading, setIsUploading] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const router = useRouter()
-  const { toast } = useToast()
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    const token = localStorage.getItem("userToken")
+    const token = localStorage.getItem("userToken");
     if (!token) {
-      router.push("/user/login")
-      return
+      router.push("/user/login");
+      return;
     }
-    fetchFiles()
-  }, [router])
+    fetchFiles();
+  }, [router]);
 
   const fetchFiles = async () => {
     try {
-      const token = localStorage.getItem("userToken")
-      const response: FilesResponse = await apiRequest("/v1/file/", {}, token!)
-      setFiles(response.files || [])
+      const token = localStorage.getItem("userToken");
+      const response: FilesResponse = await apiRequest("/v1/file/", {}, token!);
+      console.log("API Response:", response); // Debug: Log the full response
+      setFiles(response.files || []);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to fetch files",
         variant: "destructive",
-      })
+      });
       if (error.status === 401) {
-        localStorage.removeItem("userToken")
-        localStorage.removeItem("userProfile")
-        router.push("/user/login")
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("userProfile");
+        router.push("/user/login");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file)
+      setSelectedFile(file);
     }
-  }
+  };
 
   const handleUpload = async () => {
     if (!selectedFile) {
@@ -92,81 +113,114 @@ export default function FilesPage() {
         title: "Error",
         description: "Please select a file to upload",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsUploading(true)
+    setIsUploading(true);
     try {
-      const token = localStorage.getItem("userToken")
-      const response = await uploadFile("/v1/file/", selectedFile, token!)
+      const token = localStorage.getItem("userToken");
+      const response = await uploadFile("/v1/file/", selectedFile, token!);
+      console.log("Upload Response:", response); // Debug: Log the upload response
 
       toast({
         title: "Success",
         description: "File uploaded successfully",
-      })
-      setSelectedFile(null)
-      // Reset the file input
-      const fileInput = document.getElementById("file-upload") as HTMLInputElement
-      if (fileInput) fileInput.value = ""
-
-      fetchFiles()
+      });
+      setSelectedFile(null);
+      const fileInput = document.getElementById(
+        "file-upload"
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      fetchFiles();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to upload file",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const deleteFile = async (fileId: number) => {
     try {
-      const token = localStorage.getItem("userToken")
+      const token = localStorage.getItem("userToken");
       await apiRequest(
         `/v1/file/${fileId}`,
         {
           method: "DELETE",
         },
-        token!,
-      )
+        token!
+      );
 
       toast({
         title: "Success",
         description: "File deleted successfully",
-      })
-      fetchFiles()
+      });
+      fetchFiles();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to delete file",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
+
+  const handleViewFile = (file_path: string, filename: string) => {
+    try {
+      const url = new URL(file_path, window.location.origin).href;
+      window.open(url, "_blank");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to view file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadFile = (file_url: string, filename: string) => {
+    try {
+      const link = document.createElement("a");
+      link.href = file_url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to download file",
+        variant: "destructive",
+      });
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+    if (!bytes || bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (
+      Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+    );
+  };
 
   const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case "completed":
-        return "default"
+        return "default";
       case "processing":
-        return "secondary"
+        return "secondary";
       case "failed":
-        return "destructive"
+        return "destructive";
       default:
-        return "outline"
+        return "outline";
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -176,14 +230,16 @@ export default function FilesPage() {
           <p>Loading files...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Files</h1>
-        <p className="text-muted-foreground">Upload and manage your comic files</p>
+        <p className="text-muted-foreground">
+          Upload and manage your comic files
+        </p>
       </div>
 
       <Card>
@@ -192,7 +248,9 @@ export default function FilesPage() {
             <Upload className="mr-2 h-5 w-5" />
             Upload New File
           </CardTitle>
-          <CardDescription>Upload PDF files to start working with comics</CardDescription>
+          <CardDescription>
+            Upload PDF files to start working with comics
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -207,11 +265,15 @@ export default function FilesPage() {
               />
               {selectedFile && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                  Selected: {selectedFile.name} (
+                  {formatFileSize(selectedFile.size)})
                 </p>
               )}
             </div>
-            <Button onClick={handleUpload} disabled={isUploading || !selectedFile}>
+            <Button
+              onClick={handleUpload}
+              disabled={isUploading || !selectedFile}
+            >
               {isUploading ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -240,7 +302,9 @@ export default function FilesPage() {
           {files.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No files uploaded yet. Upload your first file above.</p>
+              <p className="text-muted-foreground">
+                No files uploaded yet. Upload your first file above.
+              </p>
             </div>
           ) : (
             <Table>
@@ -258,23 +322,47 @@ export default function FilesPage() {
                 {files.map((file) => (
                   <TableRow key={file.id}>
                     <TableCell>
-                      <div className="font-medium">{file.filename}</div>
-                      <div className="text-sm text-muted-foreground">ID: {file.id}</div>
+                      <div className="font-medium">
+                        {file.filename || "Unnamed"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        ID: {file.id}
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{file.file_type}</Badge>
+                      <Badge variant="outline">
+                        {file.file_type || "Unknown"}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{formatFileSize(file.file_size)}</TableCell>
+                    <TableCell>{formatFileSize(file.file_size || 0)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(file.status)}>{file.status}</Badge>
+                      <Badge variant={getStatusBadgeVariant(file.status)}>
+                        {file.status || "Unknown"}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{new Date(file.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {new Date(
+                        file.created_at || Date.now()
+                      ).toLocaleDateString()}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleViewFile(file.file_url, file.filename)
+                          }
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleDownloadFile(file.file_url, file.filename)
+                          }
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
@@ -287,7 +375,9 @@ export default function FilesPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete File</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete "{file.filename}"? This action cannot be undone.
+                                Are you sure you want to delete "
+                                {file.filename || "Unnamed"}"? This action
+                                cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -311,5 +401,5 @@ export default function FilesPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
