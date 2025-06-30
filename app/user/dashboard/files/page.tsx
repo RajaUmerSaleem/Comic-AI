@@ -23,7 +23,7 @@ import {
   Download,
   Eye,
   RefreshCw,
-  Image, // Added Image icon for Convert button
+  Image,
 } from "lucide-react";
 import {
   Table,
@@ -60,6 +60,13 @@ interface FileItem {
 interface FilesResponse {
   files: FileItem[];
   total: number;
+}
+
+interface TaskResponse {
+  task_id: string;
+  file_id: number;
+  status: string;
+  message: string;
 }
 
 export default function FilesPage() {
@@ -170,27 +177,93 @@ export default function FilesPage() {
     }
   };
 
+  const pollTaskStatus = async (taskId: string, fileId: number, filename: string) => {
+    const maxAttempts = 30; // Maximum number of polling attempts
+    const pollInterval = 5000; // Poll every 5 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const token = localStorage.getItem("userToken");
+        const response = await apiRequest(
+          `/v1/file/task-status/${taskId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+          token!
+        );
+
+        console.log("Task Status Response:", response);
+
+        if (response.status === "COMPLETED" || response.status === "FAILED") {
+          // Update the file status in the local state
+          setFiles((prevFiles) =>
+            prevFiles.map((file) =>
+              file.id === fileId ? { ...file, status: response.status } : file
+            )
+          );
+
+          toast({
+            title: response.status === "COMPLETED" ? "Success" : "Error",
+            description: `Image extraction for "${filename}" ${
+              response.status === "COMPLETED" ? "completed" : "failed"
+            }.`,
+            variant: response.status === "COMPLETED" ? "default" : "destructive",
+          });
+
+          return; // Exit polling on completion or failure
+        }
+
+        // Wait before the next poll
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to check task status",
+          variant: "destructive",
+        });
+        return; // Exit polling on error
+      }
+    }
+
+    // If max attempts are reached
+    toast({
+      title: "Error",
+      description: `Task status check timed out for "${filename}".`,
+      variant: "destructive",
+    });
+  };
+
   const convertFile = async (fileId: number, filename: string) => {
     try {
       const token = localStorage.getItem("userToken");
-      const response = await apiRequest(
+      const response: TaskResponse = await apiRequest(
         `/v1/file/async-images-from-pdf?file_id=${fileId}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-
         },
         token!
-        
       );
-
 
       toast({
         title: "Success",
         description: `Image extraction started for "${filename}"`,
       });
+
+      // Extract task_id and start polling
+      if (response.task_id) {
+        setFiles((prevFiles) =>
+          prevFiles.map((file) =>
+            file.id === fileId ? { ...file, status: response.status } : file
+          )
+        );
+        pollTaskStatus(response.task_id, fileId, filename);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -245,6 +318,7 @@ export default function FilesPage() {
       case "completed":
         return "default";
       case "processing":
+      case "progress":
         return "secondary";
       case "failed":
         return "destructive";
@@ -431,7 +505,7 @@ export default function FilesPage() {
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => deleteFile(file.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/-brain90"
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
                                 Delete
                               </AlertDialogAction>
