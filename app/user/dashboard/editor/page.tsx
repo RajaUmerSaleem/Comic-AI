@@ -33,7 +33,7 @@ interface PageData {
 }
 
 interface SpeechBubble {
-  id: number
+  bubble_id: number
   bubble_no: number
   coordinates_xyxy: number[]
   mask_coordinates_xyxy: number[][]

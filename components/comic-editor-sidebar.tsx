@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog"
 
 interface SpeechBubble {
-  id: number
+  bubble_id: number
   bubble_no: number
   coordinates_xyxy: number[]
   mask_coordinates_xyxy: number[][]
@@ -116,7 +116,7 @@ export function ComicEditorSidebar({
 
     try {
       await apiRequest(
-        `/v1/pages/bubble/${editingBubble.id}`,
+        `/v1/pages/bubble/${editingBubble.bubble_id}`,
         {
           method: "PUT",
           body: JSON.stringify({
@@ -186,30 +186,42 @@ export function ComicEditorSidebar({
     }
   }
 
-  const deleteBubble = async (bubbleId: number) => {
-    try {
-      await apiRequest(
-        `/v1/pages/bubble/${bubbleId}`,
-        {
-          method: "DELETE",
-        },
-        token!
-      )
-
-      toast({
-        title: "Success",
-        description: "Speech bubble deleted successfully",
-      })
-
-      onPagesUpdate()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
+ const deleteBubble = async (bubbleId: number | undefined) => {
+  if (bubbleId === undefined || bubbleId === null) {
+    console.error("❌ Bubble ID is missing");
+    toast({
+      title: "Error",
+      description: "Cannot delete bubble: ID is missing",
+      variant: "destructive",
+    })
+    return
   }
+
+  try {
+    const token = localStorage.getItem("userToken")
+    const response = await apiRequest(
+      `/v1/pages/bubble/${bubbleId}`,
+      {
+        method: "DELETE",
+      },
+      token!
+    )
+
+    toast({
+      title: "Success",
+      description: "Speech bubble deleted successfully",
+    })
+
+    onPagesUpdate()
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message,
+      variant: "destructive",
+    })
+  }
+}
+
 
   const updateBubbleTranslation = async (pageId: number, bubbleId: number, translation: string) => {
     try {
@@ -395,7 +407,7 @@ export function ComicEditorSidebar({
                   </p>
                 ) : (
                   selectedPage.speech_bubbles.map((bubble) => (
-                    <div key={bubble.id} className="border rounded-lg p-3">
+                    <div key={bubble.bubble_id} className="border rounded-lg p-3">
                       <div className="flex justify-between items-start mb-2">
                         <Badge variant="secondary">Bubble #{bubble.bubble_no}</Badge>
                         <div className="flex gap-1">
@@ -432,7 +444,7 @@ export function ComicEditorSidebar({
                                   />
                                 </div>
                                 <Button 
-                                  onClick={() => updateBubbleTranslation(selectedPageId!, bubble.id, bubbleTranslation)} 
+                                  onClick={() => updateBubbleTranslation(selectedPageId!, bubble.bubble_id, bubbleTranslation)} 
                                   className="w-full"
                                 >
                                   <Save className="mr-2 h-4 w-4" />
@@ -445,7 +457,7 @@ export function ComicEditorSidebar({
                               </div>
                             </DialogContent>
                           </Dialog>
-                          <Button variant="outline" size="sm" onClick={() => deleteBubble(bubble.id)}>
+                          <Button variant="outline" size="sm" onClick={() => deleteBubble(bubble.bubble_id)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
