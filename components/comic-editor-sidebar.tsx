@@ -83,6 +83,33 @@ export function ComicEditorSidebar({
     }
   }, [editingBubble])
 
+  const translateAllBubbles = async () => {
+    if (!selectedFileId) return
+
+    try {
+      await apiRequest(
+        `/v1/file/async-translate?file_id=${selectedFileId}`,
+        {
+          method: "POST",
+        },
+        token!
+      )
+ // page_id: selectedPageId || undefined,
+            // font_id: 1, 
+      toast({
+        title: "Success",
+        description: "Translation started successfully",
+      })
+      onPagesUpdate()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
   const updateBubble = async () => {
     if (!editingBubble) return
 
@@ -98,7 +125,7 @@ export function ComicEditorSidebar({
             translation: bubbleTranslation,
           }),
         },
-        token!,
+        token!
       )
 
       toast({
@@ -132,7 +159,7 @@ export function ComicEditorSidebar({
             page_id: selectedPageId,
           }),
         },
-        token!,
+        token!
       )
 
       toast({
@@ -165,7 +192,7 @@ export function ComicEditorSidebar({
         {
           method: "DELETE",
         },
-        token!,
+        token!
       )
 
       toast({
@@ -190,18 +217,11 @@ export function ComicEditorSidebar({
         {
           method: "PUT",
           body: JSON.stringify({
-            page_id: pageId,
-            bubble_data: [
-              {
-                bubble_id: bubbleId,
-                translation: translation,
-                font_size: 12,
-                font_color: [0, 0, 0],
-              },
-            ],
+            translation: translation,
+            font_id: 1, // Default font_id
           }),
         },
-        token!,
+        token!
       )
 
       toast({
@@ -312,6 +332,45 @@ export function ComicEditorSidebar({
               )}
             </Button>
           )}
+
+          <Button
+            onClick={translateAllBubbles}
+            disabled={!selectedFileId || isProcessing("translate")}
+            className="w-full"
+          >
+            {isProcessing("translate") ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              <>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Translate All Bubbles
+              </>
+            )}
+          </Button>
+
+          {selectedPageId && (
+            <Button
+              onClick={translateAllBubbles}
+              disabled={isProcessing("translate")}
+              variant="outline"
+              className="w-full"
+            >
+              {isProcessing("translate") ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Translating...
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Translate Current Page
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -371,9 +430,16 @@ export function ComicEditorSidebar({
                                     placeholder="Enter translation"
                                   />
                                 </div>
+                                <Button 
+                                  onClick={() => updateBubbleTranslation(selectedPageId!, bubble.id, bubbleTranslation)} 
+                                  className="w-full"
+                                >
+                                  <Save className="mr-2 h-4 w-4" />
+                                  Save Translation
+                                </Button>
                                 <Button onClick={updateBubble} className="w-full">
                                   <Save className="mr-2 h-4 w-4" />
-                                  Save Changes
+                                  Save All Changes
                                 </Button>
                               </div>
                             </DialogContent>
