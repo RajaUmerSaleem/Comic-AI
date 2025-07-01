@@ -89,12 +89,13 @@ export function ComicEditorSidebar({
     try {
       await apiRequest(
         `/v1/file/async-translate?file_id=${selectedFileId}`,
+        // `https://vibrant.productizetech.com/v1/file/async-translate?file_id=${selectedFileId}&page_id=${selectedPageId}&font_id=${selected}`
         {
           method: "POST",
         },
         token!
       )
- // page_id: selectedPageId || undefined,
+ 
             // font_id: 1, 
       toast({
         title: "Success",
