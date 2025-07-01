@@ -136,7 +136,7 @@ export default function EditorPage() {
         ? `/v1/file/async-detect?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-detect?file_id=${selectedFileId}`
 
-      const response = await apiRequest(url, { method: "GET" }, token!)
+      const response = await apiRequest(url, { method: "POST" }, token!)
 
       const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`
       const newProcessingTasks = new Map(processingTasks)
