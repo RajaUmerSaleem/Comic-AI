@@ -1,235 +1,257 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/components/auth-provider"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
-import { apiRequest } from "@/lib/api"
-import { Edit, Plus, Minus, ImageIcon, EyeOff, RefreshCw } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { ComicEditorSidebar } from "@/components/comic-editor-sidebar"
-import { FontManagement } from "@/components/font-management"
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/api";
+import { Edit, Plus, Minus, ImageIcon, EyeOff, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ComicEditorSidebar } from "@/components/comic-editor-sidebar";
+import { FontManagement } from "@/components/font-management";
 
 interface FileData {
-  id: number
-  file_url: string
-  status: string
-  created_at: string
+  id: number;
+  file_url: string;
+  status: string;
+  created_at: string;
 }
 
 interface PageData {
-  page_number: number
-  page_id: number
-  page_image_url: string
-  detected_image_url: string | null
-  text_removed_image_url: string | null
-  text_translated_image_url: string | null
-  status: string
-  speech_bubbles: SpeechBubble[]
+  page_number: number;
+  page_id: number;
+  page_image_url: string;
+  detected_image_url: string | null;
+  text_removed_image_url: string | null;
+  text_translated_image_url: string | null;
+  status: string;
+  speech_bubbles: SpeechBubble[];
 }
 
 interface SpeechBubble {
-  bubble_id: number
-  bubble_no: number
-  coordinates_xyxy: number[]
-  mask_coordinates_xyxy: number[][]
-  text: string
-  translation: string
+  bubble_id: number;
+  bubble_no: number;
+  coordinates_xyxy: number[];
+  mask_coordinates_xyxy: number[][];
+  text: string;
+  translation: string;
 }
 
 interface EditorSection {
-  id: string
-  name: string
-  selectedState: string
+  id: string;
+  name: string;
+  selectedState: string;
 }
 
 export default function EditorPage() {
-  const { token } = useAuth()
-  const [files, setFiles] = useState<FileData[]>([])
-  const [selectedFileId, setSelectedFileId] = useState<number | null>(null)
-  const [pages, setPages] = useState<PageData[]>([])
+  const { token } = useAuth();
+  const [files, setFiles] = useState<FileData[]>([]);
+  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+  const [pages, setPages] = useState<PageData[]>([]);
   const [sections, setSections] = useState<EditorSection[]>([
     { id: "section-1", name: "Section 1", selectedState: "image" },
-  ])
-  const [isLoading, setIsLoading] = useState(true)
-  const [processingTasks, setProcessingTasks] = useState<Map<string, string>>(new Map())
-  const [selectedPageId, setSelectedPageId] = useState<number | null>(null)
-  const { toast } = useToast()
+  ]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingTasks, setProcessingTasks] = useState<Map<string, string>>(
+    new Map()
+  );
+  const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchFiles()
-  }, [])
+    fetchFiles();
+  }, []);
 
   useEffect(() => {
     if (selectedFileId) {
-      fetchPages(selectedFileId)
+      fetchPages(selectedFileId);
     }
-  }, [selectedFileId])
+  }, [selectedFileId]);
 
   useEffect(() => {
     // Poll task statuses
     const interval = setInterval(() => {
       processingTasks.forEach((taskId, key) => {
-        pollTaskStatus(taskId, key)
-      })
-    }, 3000)
+        pollTaskStatus(taskId, key);
+      });
+    }, 3000);
 
-    return () => clearInterval(interval)
-  }, [processingTasks])
+    return () => clearInterval(interval);
+  }, [processingTasks]);
 
   const fetchFiles = async () => {
     try {
-      const response = await apiRequest("/v1/file/", {}, token!)
-      setFiles(response.files)
+      const response = await apiRequest("/v1/file/", {}, token!);
+      setFiles(response.files);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchPages = async (fileId: number) => {
     try {
-      const response = await apiRequest(`/v1/pages/${fileId}`, {}, token!)
-      setPages(response)
+      const response = await apiRequest(`/v1/pages/${fileId}`, {}, token!);
+      setPages(response);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const addSection = () => {
     const newSection: EditorSection = {
       id: `section-${sections.length + 1}`,
       name: `Section ${sections.length + 1}`,
       selectedState: "image",
-    }
-    setSections([...sections, newSection])
-  }
+    };
+    setSections([...sections, newSection]);
+  };
 
   const removeSection = (sectionId: string) => {
     if (sections.length > 1) {
-      setSections(sections.filter((s) => s.id !== sectionId))
+      setSections(sections.filter((s) => s.id !== sectionId));
     }
-  }
+  };
 
   const updateSectionState = (sectionId: string, state: string) => {
-    setSections(sections.map((s) => (s.id === sectionId ? { ...s, selectedState: state } : s)))
-  }
+    setSections(
+      sections.map((s) =>
+        s.id === sectionId ? { ...s, selectedState: state } : s
+      )
+    );
+  };
 
   const startDetection = async (pageId?: number) => {
-    if (!selectedFileId) return
+    if (!selectedFileId) return;
 
     try {
       const url = pageId
         ? `/v1/file/async-detect?file_id=${selectedFileId}&page_id=${pageId}`
-        : `/v1/file/async-detect?file_id=${selectedFileId}`
+        : `/v1/file/async-detect?file_id=${selectedFileId}`;
 
-      const response = await apiRequest(url, { method: "POST" }, token!)
+      const response = await apiRequest(url, { method: "POST" }, token!);
 
-      const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`
-      const newProcessingTasks = new Map(processingTasks)
-      newProcessingTasks.set(taskKey, response.task_id)
-      setProcessingTasks(newProcessingTasks)
+      const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`;
+      const newProcessingTasks = new Map(processingTasks);
+      newProcessingTasks.set(taskKey, response.task_id);
+      setProcessingTasks(newProcessingTasks);
 
       toast({
         title: "Detection Started",
         description: "Detecting speech bubbles...",
-      })
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const startTextRemoval = async (pageId?: number) => {
-    if (!selectedFileId) return
+    if (!selectedFileId) return;
 
     try {
       const url = pageId
         ? `/v1/file/async-remove-text?file_id=${selectedFileId}&page_id=${pageId}`
-        : `/v1/file/async-remove-text?file_id=${selectedFileId}`
+        : `/v1/file/async-remove-text?file_id=${selectedFileId}`;
 
-      const response = await apiRequest(url, { method: "POST" }, token!)
+      const response = await apiRequest(url, { method: "POST" }, token!);
 
-      const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`
-      const newProcessingTasks = new Map(processingTasks)
-      newProcessingTasks.set(taskKey, response.task_id)
-      setProcessingTasks(newProcessingTasks)
+      const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`;
+      const newProcessingTasks = new Map(processingTasks);
+      newProcessingTasks.set(taskKey, response.task_id);
+      setProcessingTasks(newProcessingTasks);
 
       toast({
         title: "Text Removal Started",
         description: "Removing text from speech bubbles...",
-      })
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const pollTaskStatus = async (taskId: string, taskKey: string) => {
     try {
-      const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token!)
+      const response = await apiRequest(
+        `/v1/file/task-status/${taskId}`,
+        {},
+        token!
+      );
 
       if (response.status === "SUCCESS" || response.status === "FAILED") {
-        const newProcessingTasks = new Map(processingTasks)
-        newProcessingTasks.delete(taskKey)
-        setProcessingTasks(newProcessingTasks)
+        const newProcessingTasks = new Map(processingTasks);
+        newProcessingTasks.delete(taskKey);
+        setProcessingTasks(newProcessingTasks);
 
         if (response.status === "SUCCESS") {
           toast({
             title: "Success",
             description: "Processing completed successfully",
-          })
+          });
           if (selectedFileId) {
-            fetchPages(selectedFileId)
+            fetchPages(selectedFileId);
           }
         } else {
           toast({
             title: "Error",
             description: "Processing failed",
             variant: "destructive",
-          })
+          });
         }
       }
     } catch (error: any) {
-      console.error("Error polling task status:", error)
+      console.error("Error polling task status:", error);
     }
-  }
+  };
 
   const getImageUrl = (page: PageData, state: string) => {
     switch (state) {
       case "detected":
-        return page.detected_image_url
+        return page.detected_image_url;
       case "text_removed":
-        return page.text_removed_image_url
+        return page.text_removed_image_url;
       case "text_translated":
-        return page.text_translated_image_url
+        return page.text_translated_image_url;
       default:
-        return page.page_image_url
+        return page.page_image_url;
     }
-  }
+  };
 
   const isStateAvailable = (page: PageData, state: string) => {
-    return getImageUrl(page, state) !== null
-  }
+    return getImageUrl(page, state) !== null;
+  };
 
   if (isLoading) {
     return (
@@ -239,14 +261,16 @@ export default function EditorPage() {
           <p>Loading editor...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Comic Editor</h1>
-        <p className="text-muted-foreground">Edit speech bubbles and add translations to your comics.</p>
+        <p className="text-muted-foreground">
+          Edit speech bubbles and add translations to your comics.
+        </p>
       </div>
 
       <Card>
@@ -299,34 +323,59 @@ export default function EditorPage() {
                         <div className="flex items-center gap-2">
                           <Tabs
                             value={section.selectedState}
-                            onValueChange={(value) => updateSectionState(section.id, value)}
+                            onValueChange={(value) =>
+                              updateSectionState(section.id, value)
+                            }
                           >
                             <TabsList className="grid w-full grid-cols-4">
-                              <TabsTrigger value="image" disabled={!pages.some((p) => isStateAvailable(p, "image"))}>
+                              <TabsTrigger
+                                value="image"
+                                disabled={
+                                  !pages.some((p) =>
+                                    isStateAvailable(p, "image")
+                                  )
+                                }
+                              >
                                 Original
                               </TabsTrigger>
                               <TabsTrigger
                                 value="detected"
-                                disabled={!pages.some((p) => isStateAvailable(p, "detected"))}
+                                disabled={
+                                  !pages.some((p) =>
+                                    isStateAvailable(p, "detected")
+                                  )
+                                }
                               >
                                 Detected
                               </TabsTrigger>
                               <TabsTrigger
                                 value="text_removed"
-                                disabled={!pages.some((p) => isStateAvailable(p, "text_removed"))}
+                                disabled={
+                                  !pages.some((p) =>
+                                    isStateAvailable(p, "text_removed")
+                                  )
+                                }
                               >
                                 Text Removed
                               </TabsTrigger>
                               <TabsTrigger
                                 value="text_translated"
-                                disabled={!pages.some((p) => isStateAvailable(p, "text_translated"))}
+                                disabled={
+                                  !pages.some((p) =>
+                                    isStateAvailable(p, "text_translated")
+                                  )
+                                }
                               >
                                 Translated
                               </TabsTrigger>
                             </TabsList>
                           </Tabs>
                           {sections.length > 1 && (
-                            <Button variant="outline" size="sm" onClick={() => removeSection(section.id)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeSection(section.id)}
+                            >
                               <Minus className="h-4 w-4" />
                             </Button>
                           )}
@@ -334,23 +383,32 @@ export default function EditorPage() {
                       </div>
 
                       <ScrollArea className="h-96 w-full border rounded">
-                        <div className="p-4 space-y-4">
+                        <div className="p-4 flex w-[100%] gap-4 overflow-x-auto">
                           {pages
                             .sort((a, b) => a.page_number - b.page_number)
                             .map((page) => {
-                              const imageUrl = getImageUrl(page, section.selectedState)
+                              const imageUrl = getImageUrl(
+                                page,
+                                section.selectedState
+                              );
                               return (
                                 <div key={page.page_id} className="space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Page {page.page_number}</span>
-                                    <Badge variant="secondary">{page.status}</Badge>
+                                    <span className="text-sm font-medium">
+                                      Page {page.page_number}
+                                    </span>
+                                    <Badge variant="secondary">
+                                      {page.status}
+                                    </Badge>
                                   </div>
                                   {imageUrl ? (
                                     <img
                                       src={imageUrl || "/placeholder.svg"}
                                       alt={`Page ${page.page_number}`}
                                       className="w-full h-auto border rounded cursor-pointer hover:opacity-80"
-                                      onClick={() => setSelectedPageId(page.page_id)}
+                                      onClick={() =>
+                                        setSelectedPageId(page.page_id)
+                                      }
                                     />
                                   ) : (
                                     <div className="w-full h-48 border rounded flex items-center justify-center text-muted-foreground">
@@ -361,7 +419,7 @@ export default function EditorPage() {
                                     </div>
                                   )}
                                 </div>
-                              )
+                              );
                             })}
                         </div>
                       </ScrollArea>
@@ -385,7 +443,9 @@ export default function EditorPage() {
                   pages={pages}
                   onDetectionStart={startDetection}
                   onTextRemovalStart={startTextRemoval}
-                  onPagesUpdate={() => selectedFileId && fetchPages(selectedFileId)}
+                  onPagesUpdate={() =>
+                    selectedFileId && fetchPages(selectedFileId)
+                  }
                   processingTasks={processingTasks}
                 />
               </TabsContent>
@@ -401,10 +461,12 @@ export default function EditorPage() {
         <Card>
           <CardContent className="text-center py-8">
             <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No pages found. Please convert the PDF to images first.</p>
+            <p className="text-muted-foreground">
+              No pages found. Please convert the PDF to images first.
+            </p>
           </CardContent>
         </Card>
       )}
     </div>
-  )
+  );
 }
