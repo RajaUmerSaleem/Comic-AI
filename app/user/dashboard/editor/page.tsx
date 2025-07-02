@@ -373,56 +373,104 @@ export default function EditorPage() {
                         </div>
                       </div>
 
-                   <div className="w-full h-[80vh] overflow-x-auto">
-  <div className="flex gap-6 h-full px-4 w-max">
-    {sections.map((section) => (
-      <div
-        key={section.id}
-        className="flex flex-col snap-y snap-mandatory overflow-y-auto h-full w-[50vw] border rounded p-2 bg-white"
-      >
-        {pages
-          .sort((a, b) => a.page_number - b.page_number)
-          .map((page) => {
-            const imageUrl = getImageUrl(page, section.selectedState);
-            return (
-              <div
-                key={`${section.id}-${page.page_id}`}
-                className="snap-start h-full flex-shrink-0"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">
-                    Page {page.page_number}
-                  </span>
-                  <Badge variant="secondary">{page.status}</Badge>
-                </div>
-
-                {imageUrl ? (
-                  <img
-                    src={imageUrl || "/placeholder.svg"}
-                    alt={`Page ${page.page_number}`}
-                    className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
-                    onClick={() => setSelectedPageId(page.page_id)}
-                  />
-                ) : (
-                  <div className="w-full h-48 border rounded flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <EyeOff className="h-8 w-8 mx-auto mb-2" />
-                      <p>Not available</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-      </div>
-    ))}
-  </div>
-                     </div>
-
-
+                     
                     </div>
                   ))}
                 </div>
+                 <CardContent>
+                        <div className="w-full h-[80vh] overflow-x-auto">
+                          <div className="flex gap-6 px-4 w-max h-full">
+                            {sections.map((section) => (
+                              <div
+                                key={section.id}
+                                className="flex flex-col snap-y snap-mandatory overflow-y-auto h-full w-[50vw] border rounded p-4 bg-white"
+                              >
+                                <div className="flex justify-between items-center mb-4">
+                                  <h3 className="font-semibold">
+                                    {section.name}
+                                  </h3>
+                                  <div className="flex items-center gap-2">
+                                    <Tabs
+                                      value={section.selectedState}
+                                      onValueChange={(value) =>
+                                        updateSectionState(section.id, value)
+                                      }
+                                    >
+                                      <TabsList className="grid w-full grid-cols-4">
+                                        <TabsTrigger value="image">
+                                          Original
+                                        </TabsTrigger>
+                                        <TabsTrigger value="detected">
+                                          Detected
+                                        </TabsTrigger>
+                                        <TabsTrigger value="text_removed">
+                                          Text Removed
+                                        </TabsTrigger>
+                                        <TabsTrigger value="text_translated">
+                                          Translated
+                                        </TabsTrigger>
+                                      </TabsList>
+                                    </Tabs>
+                                    {sections.length > 1 && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          removeSection(section.id)
+                                        }
+                                      >
+                                        <Minus className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {pages
+                                  .sort((a, b) => a.page_number - b.page_number)
+                                  .map((page) => {
+                                    const imageUrl = getImageUrl(
+                                      page,
+                                      section.selectedState
+                                    );
+                                    return (
+                                      <div
+                                        key={`${section.id}-${page.page_id}`}
+                                        className="snap-start h-full flex-shrink-0 mb-4"
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-sm font-medium">
+                                            Page {page.page_number}
+                                          </span>
+                                          <Badge variant="secondary">
+                                            {page.status}
+                                          </Badge>
+                                        </div>
+
+                                        {imageUrl ? (
+                                          <img
+                                            src={imageUrl || "/placeholder.svg"}
+                                            alt={`Page ${page.page_number}`}
+                                            className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
+                                            onClick={() =>
+                                              setSelectedPageId(page.page_id)
+                                            }
+                                          />
+                                        ) : (
+                                          <div className="w-full h-48 border rounded flex items-center justify-center text-muted-foreground">
+                                            <div className="text-center">
+                                              <EyeOff className="h-8 w-8 mx-auto mb-2" />
+                                              <p>Not available</p>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
               </CardContent>
             </Card>
           </div>
