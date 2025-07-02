@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { BookOpen, Upload, Edit, User, LogOut, ChevronUp, Home } from "lucide-react"
+import { BookOpen, Upload, Edit, User, LogOut, ChevronUp, Home, ListChecks, Type } from "lucide-react"
 import Link from "next/link"
 
 const menuItems = [
@@ -40,6 +40,16 @@ const menuItems = [
     title: "Comic Editor",
     url: "/user/dashboard/editor",
     icon: Edit,
+  },
+  {
+    title: "Font Management",
+    url: "/user/dashboard/fonts",
+    icon: Type,
+  },
+  {
+    title: "Tasks Status",
+    url: "/user/dashboard/tasks",
+    icon: ListChecks,
   },
 ]
 
