@@ -382,8 +382,8 @@ export default function EditorPage() {
                         </div>
                       </div>
 
-                      <ScrollArea className="h-96 w-full border rounded">
-                        <div className="p-4 flex w-[100%] gap-4 overflow-x-auto">
+                      <div className="w-full h-[80vh] overflow-x-auto overflow-y-auto">
+                        <div className="flex gap-6 w-max px-4">
                           {pages
                             .sort((a, b) => a.page_number - b.page_number)
                             .map((page) => {
@@ -392,8 +392,11 @@ export default function EditorPage() {
                                 section.selectedState
                               );
                               return (
-                                <div key={page.page_id} className="space-y-2">
-                                  <div className="flex items-center justify-between">
+                                <div
+                                  key={page.page_id}
+                                  className="w-[400px] h-full overflow-y-auto flex-shrink-0 border rounded p-2 bg-white"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm font-medium">
                                       Page {page.page_number}
                                     </span>
@@ -401,11 +404,12 @@ export default function EditorPage() {
                                       {page.status}
                                     </Badge>
                                   </div>
+
                                   {imageUrl ? (
                                     <img
                                       src={imageUrl || "/placeholder.svg"}
                                       alt={`Page ${page.page_number}`}
-                                      className="w-full h-auto border rounded cursor-pointer hover:opacity-80"
+                                      className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
                                       onClick={() =>
                                         setSelectedPageId(page.page_id)
                                       }
@@ -422,7 +426,7 @@ export default function EditorPage() {
                               );
                             })}
                         </div>
-                      </ScrollArea>
+                      </div>
                     </div>
                   ))}
                 </div>
