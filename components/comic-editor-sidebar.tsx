@@ -20,9 +20,7 @@ import {
   EyeOff,
   RefreshCw,
   Plus,
-  Edit,
   Trash2,
-  Save,
   Zap,
   MessageSquare,
 } from "lucide-react";
@@ -81,6 +79,10 @@ export function ComicEditorSidebar({
   const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null);
   const [bubbleText, setBubbleText] = useState("");
   const [bubbleTranslation, setBubbleTranslation] = useState("");
+  const [fonts, setFonts] = useState<{ id: number; name: string }[]>([]);
+  const [selectedFontId, setSelectedFontId] = useState<number | null>(null);
+  const [isFontDialogOpen, setIsFontDialogOpen] = useState(false);
+
   const [newBubbleData, setNewBubbleData] = useState({
     page_id: 0,
     bubble_no: 0,
@@ -100,7 +102,20 @@ export function ComicEditorSidebar({
     }
   }, [editingBubble]);
 
-  const translateAllBubbles = async () => {
+  const fetchFonts = async () => {
+    try {
+      const response = await apiRequest("/v1/fonts/", {}, token!);
+      setFonts(response || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch fonts",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const translateBubbles = async () => {
     if (!selectedFileId) return;
     try {
       await apiRequest(
@@ -310,31 +325,76 @@ export function ComicEditorSidebar({
                 variant="outline"
                 className="w-full"
               >
-                <EyeOff className="mr-2 h-4 w-4" />
+                <EyeOff className="mr-1 h-4 w-4" />
                 Remove Text Current Page
               </Button>
             )}
 
-            <Button
-              onClick={translateAllBubbles}
-              disabled={!selectedFileId || isProcessing("translate")}
-              className="w-full"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Translate All Bubbles
-            </Button>
-
-            {selectedPageId && (
-              <Button
-                onClick={translateAllBubbles}
-                disabled={isProcessing("translate")}
-                variant="outline"
-                className="w-full"
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Translate Current Page
-              </Button>
-            )}
+            <Dialog open={isFontDialogOpen} onOpenChange={setIsFontDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => {
+                    fetchFonts();
+                    setIsFontDialogOpen(true);
+                  }}
+                  disabled={!selectedFileId || isProcessing("translate")}
+                  className="w-full"
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Translate Bubbles
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Select Font for Translation</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Label htmlFor="font-select">Choose Font</Label>
+                  <select
+                    id="font-select"
+                    className="w-full border p-2 rounded"
+                    value={selectedFontId ?? ""}
+                    onChange={(e) => setSelectedFontId(Number(e.target.value))}
+                  >
+                    <option value="" disabled>
+                      Select a font
+                    </option>
+                    {fonts.map((font) => (
+                      <option key={font.id} value={font.id}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    onClick={async () => {
+                      if (!selectedFileId || !selectedFontId) return;
+                      try {
+                        await apiRequest(
+                          `/v1/file/async-translate?file_id=${selectedFileId}&font_id=${selectedFontId}`,
+                          { method: "POST" },
+                          token!
+                        );
+                        toast({
+                          title: "Success",
+                          description: "Translation started",
+                        });
+                        onPagesUpdate();
+                        setIsFontDialogOpen(false);
+                      } catch (error: any) {
+                        toast({
+                          title: "Error",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    Save and Translate
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       )}

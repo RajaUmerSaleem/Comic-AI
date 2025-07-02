@@ -64,7 +64,6 @@ export function FontManagement() {
     try {
       const token = localStorage.getItem("userToken")
     const response = await apiRequest("/v1/fonts/", {}, token!)
-      console.log("fontttt respiosne", response);
       
       setFonts(response || [])
     } catch (error: any) {

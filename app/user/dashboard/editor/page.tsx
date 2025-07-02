@@ -180,8 +180,7 @@ export default function EditorPage() {
       const response = await apiRequest(url, { method: "POST" }, token!);
 
       const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`;
-addTask(taskKey, response.task_id);
-
+      addTask(taskKey, response.task_id);
 
       toast({
         title: "Text Removal Started",
@@ -205,7 +204,7 @@ addTask(taskKey, response.task_id);
       );
 
       if (response.status === "SUCCESS" || response.status === "FAILED") {
-       removeTask(taskKey);
+        removeTask(taskKey);
 
         if (response.status === "SUCCESS") {
           toast({
@@ -374,51 +373,53 @@ addTask(taskKey, response.task_id);
                         </div>
                       </div>
 
-                      <div className="w-full h-[80vh] overflow-x-auto overflow-y-auto">
-                        <div className="flex gap-6 w-max px-4">
-                          {pages
-                            .sort((a, b) => a.page_number - b.page_number)
-                            .map((page) => {
-                              const imageUrl = getImageUrl(
-                                page,
-                                section.selectedState
-                              );
-                              return (
-                                <div
-                                  key={page.page_id}
-                                  className="w-[400px] h-full overflow-y-auto flex-shrink-0 border rounded p-2 bg-white"
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium">
-                                      Page {page.page_number}
-                                    </span>
-                                    <Badge variant="secondary">
-                                      {page.status}
-                                    </Badge>
-                                  </div>
+                   <div className="w-full h-[80vh] overflow-x-auto">
+  <div className="flex gap-6 h-full px-4 w-max">
+    {sections.map((section) => (
+      <div
+        key={section.id}
+        className="flex flex-col snap-y snap-mandatory overflow-y-auto h-full w-[50vw] border rounded p-2 bg-white"
+      >
+        {pages
+          .sort((a, b) => a.page_number - b.page_number)
+          .map((page) => {
+            const imageUrl = getImageUrl(page, section.selectedState);
+            return (
+              <div
+                key={`${section.id}-${page.page_id}`}
+                className="snap-start h-full flex-shrink-0"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">
+                    Page {page.page_number}
+                  </span>
+                  <Badge variant="secondary">{page.status}</Badge>
+                </div>
 
-                                  {imageUrl ? (
-                                    <img
-                                      src={imageUrl || "/placeholder.svg"}
-                                      alt={`Page ${page.page_number}`}
-                                      className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
-                                      onClick={() =>
-                                        setSelectedPageId(page.page_id)
-                                      }
-                                    />
-                                  ) : (
-                                    <div className="w-full h-48 border rounded flex items-center justify-center text-muted-foreground">
-                                      <div className="text-center">
-                                        <EyeOff className="h-8 w-8 mx-auto mb-2" />
-                                        <p>Not available</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
+                {imageUrl ? (
+                  <img
+                    src={imageUrl || "/placeholder.svg"}
+                    alt={`Page ${page.page_number}`}
+                    className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
+                    onClick={() => setSelectedPageId(page.page_id)}
+                  />
+                ) : (
+                  <div className="w-full h-48 border rounded flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <EyeOff className="h-8 w-8 mx-auto mb-2" />
+                      <p>Not available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+      </div>
+    ))}
+  </div>
+                     </div>
+
+
                     </div>
                   ))}
                 </div>
@@ -433,32 +434,33 @@ addTask(taskKey, response.task_id);
                 <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
               </TabsList>
               <TabsContent value="editor">
-  <ComicEditorSidebar
-    selectedFileId={selectedFileId}
-    selectedPageId={selectedPageId}
-    pages={pages}
-    onDetectionStart={startDetection}
-    onTextRemovalStart={startTextRemoval}
-    onPagesUpdate={() => selectedFileId && fetchPages(selectedFileId)}
-    processingTasks={processingTasks}
-    mode="editor" // 👈 Only show buttons
-  />
-</TabsContent>
+                <ComicEditorSidebar
+                  selectedFileId={selectedFileId}
+                  selectedPageId={selectedPageId}
+                  pages={pages}
+                  onDetectionStart={startDetection}
+                  onTextRemovalStart={startTextRemoval}
+                  onPagesUpdate={() =>
+                    selectedFileId && fetchPages(selectedFileId)
+                  }
+                  processingTasks={processingTasks}
+                  mode="editor" // 👈 Only show buttons
+                />
+              </TabsContent>
               <TabsContent value="bubbles">
-  <ComicEditorSidebar
-    selectedFileId={selectedFileId}
-    selectedPageId={selectedPageId}
-    pages={pages}
-    onDetectionStart={startDetection}
-    onTextRemovalStart={startTextRemoval}
-    onPagesUpdate={() => selectedFileId && fetchPages(selectedFileId)}
-    processingTasks={processingTasks}
-    mode="bubbles" // 👈 Only show speech bubbles
-  />
-</TabsContent>
-
-
-
+                <ComicEditorSidebar
+                  selectedFileId={selectedFileId}
+                  selectedPageId={selectedPageId}
+                  pages={pages}
+                  onDetectionStart={startDetection}
+                  onTextRemovalStart={startTextRemoval}
+                  onPagesUpdate={() =>
+                    selectedFileId && fetchPages(selectedFileId)
+                  }
+                  processingTasks={processingTasks}
+                  mode="bubbles" // 👈 Only show speech bubbles
+                />
+              </TabsContent>
             </Tabs>
           </div>
         </div>
