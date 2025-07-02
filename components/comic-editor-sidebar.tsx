@@ -114,7 +114,6 @@ export function ComicEditorSidebar({
         token!
       );
 
-      // font_id: 1,
       toast({
         title: "Success",
         description: "Translation started successfully",

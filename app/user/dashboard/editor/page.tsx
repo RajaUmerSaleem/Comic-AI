@@ -22,7 +22,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
 import { Edit, Plus, Minus, ImageIcon, EyeOff, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ComicEditorSidebar } from "@/components/comic-editor-sidebar";
 import { FontManagement } from "@/components/font-management";
 
@@ -85,7 +84,6 @@ export default function EditorPage() {
   }, [selectedFileId]);
 
   useEffect(() => {
-    // Poll task statuses
     const interval = setInterval(() => {
       processingTasks.forEach((taskId, key) => {
         pollTaskStatus(taskId, key);
@@ -436,9 +434,10 @@ export default function EditorPage() {
 
           <div className="lg:col-span-1">
             <Tabs defaultValue="editor" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="editor">Editor</TabsTrigger>
                 <TabsTrigger value="fonts">Fonts</TabsTrigger>
+                <TabsTrigger value="status">Task Status</TabsTrigger>
               </TabsList>
               <TabsContent value="editor">
                 <ComicEditorSidebar
@@ -456,6 +455,20 @@ export default function EditorPage() {
               <TabsContent value="fonts">
                 <FontManagement />
               </TabsContent>
+             <TabsContent value="status">
+  <div className="space-y-4 p-2">
+    {processingTasks.size === 0 ? (
+      <p className="text-muted-foreground">No active tasks.</p>
+    ) : (
+      Array.from(processingTasks.entries()).map(([_, taskId]) => (
+        <TaskStatus key={taskId} taskId={taskId} token={token!} />
+      ))
+    )}
+  </div>
+
+  
+</TabsContent>
+
             </Tabs>
           </div>
         </div>
@@ -471,6 +484,46 @@ export default function EditorPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function TaskStatus({
+  taskId,
+  token,
+}: {
+  taskId: string;
+  token: string;
+}) {
+  const [status, setStatus] = useState<string>("Checking...");
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(
+          `https://vibrant.productizetech.com/v1/file/task-status/${taskId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        const data = await res.json();
+        setStatus(data.status || "Unknown");
+      } catch (err) {
+        setStatus("Error");
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => clearInterval(interval);
+  }, [taskId, token]);
+
+  return (
+    <div className="flex justify-between items-center border p-2 rounded text-sm">
+      <span className="font-medium text-gray-700">Task ID: {taskId}</span>
+      <Badge variant="secondary">{status}</Badge>
     </div>
   );
 }
