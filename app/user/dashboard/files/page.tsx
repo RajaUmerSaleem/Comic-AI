@@ -464,6 +464,7 @@ export default function FilesPage() {
                           <AlertDialogTrigger asChild>
                             <Button variant="outline" size="sm">
                               <Image className="h-4 w-4" />
+                              Convert to Images
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
