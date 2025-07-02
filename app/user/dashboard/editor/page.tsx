@@ -430,21 +430,34 @@ addTask(taskKey, response.task_id);
             <Tabs defaultValue="editor" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="editor">Editor</TabsTrigger>
-                <TabsTrigger value="fonts">Speech Bubbles</TabsTrigger>
+                <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
               </TabsList>
               <TabsContent value="editor">
-                <ComicEditorSidebar
-                  selectedFileId={selectedFileId}
-                  selectedPageId={selectedPageId}
-                  pages={pages}
-                  onDetectionStart={startDetection}
-                  onTextRemovalStart={startTextRemoval}
-                  onPagesUpdate={() =>
-                    selectedFileId && fetchPages(selectedFileId)
-                  }
-                  processingTasks={processingTasks}
-                />
-              </TabsContent>
+  <ComicEditorSidebar
+    selectedFileId={selectedFileId}
+    selectedPageId={selectedPageId}
+    pages={pages}
+    onDetectionStart={startDetection}
+    onTextRemovalStart={startTextRemoval}
+    onPagesUpdate={() => selectedFileId && fetchPages(selectedFileId)}
+    processingTasks={processingTasks}
+    mode="editor" // 👈 Only show buttons
+  />
+</TabsContent>
+              <TabsContent value="bubbles">
+  <ComicEditorSidebar
+    selectedFileId={selectedFileId}
+    selectedPageId={selectedPageId}
+    pages={pages}
+    onDetectionStart={startDetection}
+    onTextRemovalStart={startTextRemoval}
+    onPagesUpdate={() => selectedFileId && fetchPages(selectedFileId)}
+    processingTasks={processingTasks}
+    mode="bubbles" // 👈 Only show speech bubbles
+  />
+</TabsContent>
+
+
 
             </Tabs>
           </div>

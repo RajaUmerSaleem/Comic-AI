@@ -64,6 +64,7 @@ interface ComicEditorSidebarProps {
   onTextRemovalStart: (pageId?: number) => void;
   onPagesUpdate: () => void;
   processingTasks: Map<string, string>;
+  mode: "editor" | "bubbles"; // ✅ added mode
 }
 
 export function ComicEditorSidebar({
@@ -74,11 +75,9 @@ export function ComicEditorSidebar({
   onTextRemovalStart,
   onPagesUpdate,
   processingTasks,
+  mode,
 }: ComicEditorSidebarProps) {
   const { token } = useAuth();
-  const [selectedBubble, setSelectedBubble] = useState<SpeechBubble | null>(
-    null
-  );
   const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null);
   const [bubbleText, setBubbleText] = useState("");
   const [bubbleTranslation, setBubbleTranslation] = useState("");
@@ -103,34 +102,21 @@ export function ComicEditorSidebar({
 
   const translateAllBubbles = async () => {
     if (!selectedFileId) return;
-
     try {
       await apiRequest(
         `/v1/file/async-translate?file_id=${selectedFileId}`,
-        // `https://vibrant.productizetech.com/v1/file/async-translate?file_id=${selectedFileId}&page_id=${selectedPageId}&font_id=${selected}`
-        {
-          method: "POST",
-        },
+        { method: "POST" },
         token!
       );
-
-      toast({
-        title: "Success",
-        description: "Translation started successfully",
-      });
+      toast({ title: "Success", description: "Translation started successfully" });
       onPagesUpdate();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   const updateBubble = async () => {
     if (!editingBubble) return;
-
     try {
       await apiRequest(
         `/v1/pages/bubble/${editingBubble.bubble_id}`,
@@ -145,46 +131,28 @@ export function ComicEditorSidebar({
         },
         token!
       );
-
-      toast({
-        title: "Success",
-        description: "Speech bubble updated successfully",
-      });
-
+      toast({ title: "Success", description: "Speech bubble updated successfully" });
       setEditingBubble(null);
       setBubbleText("");
       setBubbleTranslation("");
       onPagesUpdate();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   const createBubble = async () => {
     if (!selectedPageId) return;
-
     try {
       await apiRequest(
         "/v1/pages/bubble",
         {
           method: "POST",
-          body: JSON.stringify({
-            ...newBubbleData,
-            page_id: selectedPageId,
-          }),
+          body: JSON.stringify({ ...newBubbleData, page_id: selectedPageId }),
         },
         token!
       );
-
-      toast({
-        title: "Success",
-        description: "Speech bubble created successfully",
-      });
-
+      toast({ title: "Success", description: "Speech bubble created successfully" });
       setNewBubbleData({
         page_id: 0,
         bubble_no: 0,
@@ -195,47 +163,21 @@ export function ComicEditorSidebar({
       });
       onPagesUpdate();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   const deleteBubble = async (bubbleId: number | undefined) => {
-    if (bubbleId === undefined || bubbleId === null) {
-      console.error("❌ Bubble ID is missing");
-      toast({
-        title: "Error",
-        description: "Cannot delete bubble: ID is missing",
-        variant: "destructive",
-      });
+    if (bubbleId == null) {
+      toast({ title: "Error", description: "Missing bubble ID", variant: "destructive" });
       return;
     }
-
     try {
-      const token = localStorage.getItem("userToken");
-      const response = await apiRequest(
-        `/v1/pages/bubble/${bubbleId}`,
-        {
-          method: "DELETE",
-        },
-        token!
-      );
-
-      toast({
-        title: "Success",
-        description: "Speech bubble deleted successfully",
-      });
-
+      await apiRequest(`/v1/pages/bubble/${bubbleId}`, { method: "DELETE" }, token!);
+      toast({ title: "Success", description: "Speech bubble deleted" });
       onPagesUpdate();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -252,75 +194,40 @@ export function ComicEditorSidebar({
           body: JSON.stringify({
             page_id: pageId,
             font_id: 1,
-            bubble_data: [
-              {
-                bubble_id: bubbleId,
-                translation: translation,
-              },
-            ],
+            bubble_data: [{ bubble_id: bubbleId, translation }],
           }),
         },
         token!
       );
-
-      toast({
-        title: "Success",
-        description: "Translation updated successfully",
-      });
-
+      toast({ title: "Success", description: "Translation updated" });
       onPagesUpdate();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   const isProcessing = (type: string) => {
-    const taskKey = selectedPageId
-      ? `${type}-${selectedPageId}`
-      : `${type}-${selectedFileId}`;
+    const taskKey = selectedPageId ? `${type}-${selectedPageId}` : `${type}-${selectedFileId}`;
     return processingTasks.has(taskKey);
   };
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Zap className="mr-2 h-4 w-4" />
-            Processing Controls
-          </CardTitle>
-          <CardDescription>
-            Generate detection and remove text from speech bubbles
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button
-            onClick={() => onDetectionStart()}
-            disabled={!selectedFileId || isProcessing("detect")}
-            className="w-full"
-          >
-            {isProcessing("detect") ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Detecting...
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                Detect All Pages
-              </>
-            )}
-          </Button>
-
-          {selectedPageId && (
+      {mode === "editor" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Zap className="mr-2 h-4 w-4" />
+              Processing Controls
+            </CardTitle>
+            <CardDescription>
+              Generate detection and remove text from speech bubbles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <Button
-              onClick={() => onDetectionStart(selectedPageId)}
-              disabled={isProcessing("detect")}
-              variant="outline"
+              onClick={() => onDetectionStart()}
+              disabled={!selectedFileId || isProcessing("detect")}
               className="w-full"
             >
               {isProcessing("detect") ? (
@@ -331,93 +238,69 @@ export function ComicEditorSidebar({
               ) : (
                 <>
                   <Eye className="mr-2 h-4 w-4" />
-                  Detect Current Page
+                  Detect All Pages
                 </>
               )}
             </Button>
-          )}
 
-          <Button
-            onClick={() => onTextRemovalStart()}
-            disabled={!selectedFileId || isProcessing("remove")}
-            className="w-full"
-          >
-            {isProcessing("remove") ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Removing Text...
-              </>
-            ) : (
-              <>
-                <EyeOff className="mr-2 h-4 w-4" />
-                Remove Text All Pages
-              </>
+            {selectedPageId && (
+              <Button
+                onClick={() => onDetectionStart(selectedPageId)}
+                disabled={isProcessing("detect")}
+                variant="outline"
+                className="w-full"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Detect Current Page
+              </Button>
             )}
-          </Button>
 
-          {selectedPageId && (
             <Button
-              onClick={() => onTextRemovalStart(selectedPageId)}
-              disabled={isProcessing("remove")}
-              variant="outline"
+              onClick={() => onTextRemovalStart()}
+              disabled={!selectedFileId || isProcessing("remove")}
               className="w-full"
             >
-              {isProcessing("remove") ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Removing Text...
-                </>
-              ) : (
-                <>
-                  <EyeOff className="mr-2 h-4 w-4" />
-                  Remove Text Current Page
-                </>
-              )}
+              <EyeOff className="mr-2 h-4 w-4" />
+              Remove Text All Pages
             </Button>
-          )}
 
-          <Button
-            onClick={translateAllBubbles}
-            disabled={!selectedFileId || isProcessing("translate")}
-            className="w-full"
-          >
-            {isProcessing("translate") ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Translating...
-              </>
-            ) : (
-              <>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Translate All Bubbles
-              </>
+            {selectedPageId && (
+              <Button
+                onClick={() => onTextRemovalStart(selectedPageId)}
+                disabled={isProcessing("remove")}
+                variant="outline"
+                className="w-full"
+              >
+                <EyeOff className="mr-2 h-4 w-4" />
+                Remove Text Current Page
+              </Button>
             )}
-          </Button>
 
-          {selectedPageId && (
             <Button
               onClick={translateAllBubbles}
-              disabled={isProcessing("translate")}
-              variant="outline"
+              disabled={!selectedFileId || isProcessing("translate")}
               className="w-full"
             >
-              {isProcessing("translate") ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Translating...
-                </>
-              ) : (
-                <>
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Translate Current Page
-                </>
-              )}
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Translate All Bubbles
             </Button>
-          )}
-        </CardContent>
-      </Card>
 
-      {selectedPage && (
+            {selectedPageId && (
+              <Button
+                onClick={translateAllBubbles}
+                disabled={isProcessing("translate")}
+                variant="outline"
+                className="w-full"
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Translate Current Page
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {mode === "bubbles" && selectedPage && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -425,8 +308,7 @@ export function ComicEditorSidebar({
               Speech Bubbles
             </CardTitle>
             <CardDescription>
-              Page {selectedPage.page_number} -{" "}
-              {selectedPage.speech_bubbles.length} bubbles
+              Page {selectedPage.page_number} - {selectedPage.speech_bubbles.length} bubbles
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -438,14 +320,9 @@ export function ComicEditorSidebar({
                   </p>
                 ) : (
                   selectedPage.speech_bubbles.map((bubble) => (
-                    <div
-                      key={bubble.bubble_id}
-                      className="border rounded-lg p-3"
-                    >
+                    <div key={bubble.bubble_id} className="border rounded-lg p-3">
                       <div className="flex justify-between items-start mb-2">
-                        <Badge variant="secondary">
-                          Bubble #{bubble.bubble_no}
-                        </Badge>
+                        <Badge variant="secondary">Bubble #{bubble.bubble_no}</Badge>
                         <div className="flex gap-1">
                           <Dialog>
                             <DialogTrigger asChild>
@@ -461,35 +338,24 @@ export function ComicEditorSidebar({
                               <DialogHeader>
                                 <DialogTitle>Edit Speech Bubble</DialogTitle>
                                 <DialogDescription>
-                                  Update the text and translation for this
-                                  speech bubble
+                                  Update the text and translation for this speech bubble
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div>
-                                  <Label htmlFor="bubble-text">
-                                    Original Text
-                                  </Label>
+                                  <Label htmlFor="bubble-text">Original Text</Label>
                                   <Textarea
                                     id="bubble-text"
                                     value={bubbleText}
-                                    onChange={(e) =>
-                                      setBubbleText(e.target.value)
-                                    }
-                                    placeholder="Enter original text"
+                                    onChange={(e) => setBubbleText(e.target.value)}
                                   />
                                 </div>
                                 <div>
-                                  <Label htmlFor="bubble-translation">
-                                    Translation
-                                  </Label>
+                                  <Label htmlFor="bubble-translation">Translation</Label>
                                   <Textarea
                                     id="bubble-translation"
                                     value={bubbleTranslation}
-                                    onChange={(e) =>
-                                      setBubbleTranslation(e.target.value)
-                                    }
-                                    placeholder="Enter translation"
+                                    onChange={(e) => setBubbleTranslation(e.target.value)}
                                   />
                                 </div>
                                 <Button
@@ -505,10 +371,7 @@ export function ComicEditorSidebar({
                                   <Save className="mr-2 h-4 w-4" />
                                   Save Translation
                                 </Button>
-                                <Button
-                                  onClick={updateBubble}
-                                  className="w-full"
-                                >
+                                <Button onClick={updateBubble} className="w-full">
                                   <Save className="mr-2 h-4 w-4" />
                                   Save All Changes
                                 </Button>
@@ -525,27 +388,14 @@ export function ComicEditorSidebar({
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Original:
-                          </p>
-                          <p className="text-sm">
-                            {bubble.text || "No text detected"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Translation:
-                          </p>
-                          <p className="text-sm">
-                            {bubble.translation || "No translation"}
-                          </p>
-                        </div>
+                        <p className="text-xs font-medium text-muted-foreground">Original:</p>
+                        <p className="text-sm">{bubble.text || "No text detected"}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Translation:</p>
+                        <p className="text-sm">{bubble.translation || "No translation"}</p>
                       </div>
                     </div>
                   ))
                 )}
-
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full bg-transparent">
@@ -556,41 +406,25 @@ export function ComicEditorSidebar({
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Create Speech Bubble</DialogTitle>
-                      <DialogDescription>
-                        Add a new speech bubble to this page
-                      </DialogDescription>
+                      <DialogDescription>Add a new speech bubble to this page</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="new-bubble-text">Text</Label>
-                        <Textarea
-                          id="new-bubble-text"
-                          value={newBubbleData.text}
-                          onChange={(e) =>
-                            setNewBubbleData((prev) => ({
-                              ...prev,
-                              text: e.target.value,
-                            }))
-                          }
-                          placeholder="Enter text"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-bubble-translation">
-                          Translation
-                        </Label>
-                        <Textarea
-                          id="new-bubble-translation"
-                          value={newBubbleData.translation}
-                          onChange={(e) =>
-                            setNewBubbleData((prev) => ({
-                              ...prev,
-                              translation: e.target.value,
-                            }))
-                          }
-                          placeholder="Enter translation"
-                        />
-                      </div>
+                      <Label htmlFor="new-bubble-text">Text</Label>
+                      <Textarea
+                        id="new-bubble-text"
+                        value={newBubbleData.text}
+                        onChange={(e) =>
+                          setNewBubbleData((prev) => ({ ...prev, text: e.target.value }))
+                        }
+                      />
+                      <Label htmlFor="new-bubble-translation">Translation</Label>
+                      <Textarea
+                        id="new-bubble-translation"
+                        value={newBubbleData.translation}
+                        onChange={(e) =>
+                          setNewBubbleData((prev) => ({ ...prev, translation: e.target.value }))
+                        }
+                      />
                       <Button onClick={createBubble} className="w-full">
                         <Plus className="mr-2 h-4 w-4" />
                         Create Bubble
