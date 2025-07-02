@@ -1,16 +1,32 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/components/auth-provider"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
-import { apiRequest } from "@/lib/api"
-import { Eye, EyeOff, RefreshCw, Plus, Edit, Trash2, Save, Zap, MessageSquare } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/api";
+import {
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  Zap,
+  MessageSquare,
+} from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -18,36 +34,36 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 interface SpeechBubble {
-  bubble_id: number
-  bubble_no: number
-  coordinates_xyxy: number[]
-  mask_coordinates_xyxy: number[][]
-  text: string
-  translation: string
+  bubble_id: number;
+  bubble_no: number;
+  coordinates_xyxy: number[];
+  mask_coordinates_xyxy: number[][];
+  text: string;
+  translation: string;
 }
 
 interface PageData {
-  page_number: number
-  page_id: number
-  page_image_url: string
-  detected_image_url: string | null
-  text_removed_image_url: string | null
-  text_translated_image_url: string | null
-  status: string
-  speech_bubbles: SpeechBubble[]
+  page_number: number;
+  page_id: number;
+  page_image_url: string;
+  detected_image_url: string | null;
+  text_removed_image_url: string | null;
+  text_translated_image_url: string | null;
+  status: string;
+  speech_bubbles: SpeechBubble[];
 }
 
 interface ComicEditorSidebarProps {
-  selectedFileId: number | null
-  selectedPageId: number | null
-  pages: PageData[]
-  onDetectionStart: (pageId?: number) => void
-  onTextRemovalStart: (pageId?: number) => void
-  onPagesUpdate: () => void
-  processingTasks: Map<string, string>
+  selectedFileId: number | null;
+  selectedPageId: number | null;
+  pages: PageData[];
+  onDetectionStart: (pageId?: number) => void;
+  onTextRemovalStart: (pageId?: number) => void;
+  onPagesUpdate: () => void;
+  processingTasks: Map<string, string>;
 }
 
 export function ComicEditorSidebar({
@@ -59,11 +75,13 @@ export function ComicEditorSidebar({
   onPagesUpdate,
   processingTasks,
 }: ComicEditorSidebarProps) {
-  const { token } = useAuth()
-  const [selectedBubble, setSelectedBubble] = useState<SpeechBubble | null>(null)
-  const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null)
-  const [bubbleText, setBubbleText] = useState("")
-  const [bubbleTranslation, setBubbleTranslation] = useState("")
+  const { token } = useAuth();
+  const [selectedBubble, setSelectedBubble] = useState<SpeechBubble | null>(
+    null
+  );
+  const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null);
+  const [bubbleText, setBubbleText] = useState("");
+  const [bubbleTranslation, setBubbleTranslation] = useState("");
   const [newBubbleData, setNewBubbleData] = useState({
     page_id: 0,
     bubble_no: 0,
@@ -71,20 +89,20 @@ export function ComicEditorSidebar({
     mask_coordinates_xyxy: [[0, 0]],
     text: "",
     translation: "",
-  })
-  const { toast } = useToast()
+  });
+  const { toast } = useToast();
 
-  const selectedPage = pages.find((p) => p.page_id === selectedPageId)
+  const selectedPage = pages.find((p) => p.page_id === selectedPageId);
 
   useEffect(() => {
     if (editingBubble) {
-      setBubbleText(editingBubble.text)
-      setBubbleTranslation(editingBubble.translation)
+      setBubbleText(editingBubble.text);
+      setBubbleTranslation(editingBubble.translation);
     }
-  }, [editingBubble])
+  }, [editingBubble]);
 
   const translateAllBubbles = async () => {
-    if (!selectedFileId) return
+    if (!selectedFileId) return;
 
     try {
       await apiRequest(
@@ -94,25 +112,25 @@ export function ComicEditorSidebar({
           method: "POST",
         },
         token!
-      )
- 
-            // font_id: 1, 
+      );
+
+      // font_id: 1,
       toast({
         title: "Success",
         description: "Translation started successfully",
-      })
-      onPagesUpdate()
+      });
+      onPagesUpdate();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const updateBubble = async () => {
-    if (!editingBubble) return
+    if (!editingBubble) return;
 
     try {
       await apiRequest(
@@ -127,28 +145,28 @@ export function ComicEditorSidebar({
           }),
         },
         token!
-      )
+      );
 
       toast({
         title: "Success",
         description: "Speech bubble updated successfully",
-      })
+      });
 
-      setEditingBubble(null)
-      setBubbleText("")
-      setBubbleTranslation("")
-      onPagesUpdate()
+      setEditingBubble(null);
+      setBubbleText("");
+      setBubbleTranslation("");
+      onPagesUpdate();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const createBubble = async () => {
-    if (!selectedPageId) return
+    if (!selectedPageId) return;
 
     try {
       await apiRequest(
@@ -161,12 +179,12 @@ export function ComicEditorSidebar({
           }),
         },
         token!
-      )
+      );
 
       toast({
         title: "Success",
         description: "Speech bubble created successfully",
-      })
+      });
 
       setNewBubbleData({
         page_id: 0,
@@ -175,87 +193,98 @@ export function ComicEditorSidebar({
         mask_coordinates_xyxy: [[0, 0]],
         text: "",
         translation: "",
-      })
-      onPagesUpdate()
+      });
+      onPagesUpdate();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
- const deleteBubble = async (bubbleId: number | undefined) => {
-  if (bubbleId === undefined || bubbleId === null) {
-    console.error("❌ Bubble ID is missing");
-    toast({
-      title: "Error",
-      description: "Cannot delete bubble: ID is missing",
-      variant: "destructive",
-    })
-    return
-  }
+  const deleteBubble = async (bubbleId: number | undefined) => {
+    if (bubbleId === undefined || bubbleId === null) {
+      console.error("❌ Bubble ID is missing");
+      toast({
+        title: "Error",
+        description: "Cannot delete bubble: ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  try {
-    const token = localStorage.getItem("userToken")
-    const response = await apiRequest(
-      `/v1/pages/bubble/${bubbleId}`,
-      {
-        method: "DELETE",
-      },
-      token!
-    )
+    try {
+      const token = localStorage.getItem("userToken");
+      const response = await apiRequest(
+        `/v1/pages/bubble/${bubbleId}`,
+        {
+          method: "DELETE",
+        },
+        token!
+      );
 
-    toast({
-      title: "Success",
-      description: "Speech bubble deleted successfully",
-    })
+      toast({
+        title: "Success",
+        description: "Speech bubble deleted successfully",
+      });
 
-    onPagesUpdate()
-  } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message,
-      variant: "destructive",
-    })
-  }
-}
+      onPagesUpdate();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
-
-  const updateBubbleTranslation = async (pageId: number, bubbleId: number, translation: string) => {
+  const updateBubbleTranslation = async (
+    pageId: number,
+    bubbleId: number,
+    translation: string
+  ) => {
     try {
       await apiRequest(
         `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
         {
           method: "PUT",
           body: JSON.stringify({
-            translation: translation,
-            font_id: 1, // Default font_id
+            page_id: pageId,
+            font_id: 1,
+            bubble_data: [
+              {
+                bubble_id: bubbleId,
+                translation: translation,
+              },
+            ],
           }),
         },
         token!
-      )
+      );
 
       toast({
         title: "Success",
         description: "Translation updated successfully",
-      })
+      });
 
-      onPagesUpdate()
+      onPagesUpdate();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const isProcessing = (type: string) => {
-    const taskKey = selectedPageId ? `${type}-${selectedPageId}` : `${type}-${selectedFileId}`
-    return processingTasks.has(taskKey)
-  }
+    const taskKey = selectedPageId
+      ? `${type}-${selectedPageId}`
+      : `${type}-${selectedFileId}`;
+    return processingTasks.has(taskKey);
+  };
 
   return (
     <div className="space-y-4">
@@ -265,7 +294,9 @@ export function ComicEditorSidebar({
             <Zap className="mr-2 h-4 w-4" />
             Processing Controls
           </CardTitle>
-          <CardDescription>Generate detection and remove text from speech bubbles</CardDescription>
+          <CardDescription>
+            Generate detection and remove text from speech bubbles
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button
@@ -395,7 +426,8 @@ export function ComicEditorSidebar({
               Speech Bubbles
             </CardTitle>
             <CardDescription>
-              Page {selectedPage.page_number} - {selectedPage.speech_bubbles.length} bubbles
+              Page {selectedPage.page_number} -{" "}
+              {selectedPage.speech_bubbles.length} bubbles
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -407,13 +439,22 @@ export function ComicEditorSidebar({
                   </p>
                 ) : (
                   selectedPage.speech_bubbles.map((bubble) => (
-                    <div key={bubble.bubble_id} className="border rounded-lg p-3">
+                    <div
+                      key={bubble.bubble_id}
+                      className="border rounded-lg p-3"
+                    >
                       <div className="flex justify-between items-start mb-2">
-                        <Badge variant="secondary">Bubble #{bubble.bubble_no}</Badge>
+                        <Badge variant="secondary">
+                          Bubble #{bubble.bubble_no}
+                        </Badge>
                         <div className="flex gap-1">
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setEditingBubble(bubble)}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingBubble(bubble)}
+                              >
                                 <Edit className="h-3 w-3" />
                               </Button>
                             </DialogTrigger>
@@ -421,55 +462,85 @@ export function ComicEditorSidebar({
                               <DialogHeader>
                                 <DialogTitle>Edit Speech Bubble</DialogTitle>
                                 <DialogDescription>
-                                  Update the text and translation for this speech bubble
+                                  Update the text and translation for this
+                                  speech bubble
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div>
-                                  <Label htmlFor="bubble-text">Original Text</Label>
+                                  <Label htmlFor="bubble-text">
+                                    Original Text
+                                  </Label>
                                   <Textarea
                                     id="bubble-text"
                                     value={bubbleText}
-                                    onChange={(e) => setBubbleText(e.target.value)}
+                                    onChange={(e) =>
+                                      setBubbleText(e.target.value)
+                                    }
                                     placeholder="Enter original text"
                                   />
                                 </div>
                                 <div>
-                                  <Label htmlFor="bubble-translation">Translation</Label>
+                                  <Label htmlFor="bubble-translation">
+                                    Translation
+                                  </Label>
                                   <Textarea
                                     id="bubble-translation"
                                     value={bubbleTranslation}
-                                    onChange={(e) => setBubbleTranslation(e.target.value)}
+                                    onChange={(e) =>
+                                      setBubbleTranslation(e.target.value)
+                                    }
                                     placeholder="Enter translation"
                                   />
                                 </div>
-                                <Button 
-                                  onClick={() => updateBubbleTranslation(selectedPageId!, bubble.bubble_id, bubbleTranslation)} 
+                                <Button
+                                  onClick={() =>
+                                    updateBubbleTranslation(
+                                      selectedPageId!,
+                                      bubble.bubble_id,
+                                      bubbleTranslation
+                                    )
+                                  }
                                   className="w-full"
                                 >
                                   <Save className="mr-2 h-4 w-4" />
                                   Save Translation
                                 </Button>
-                                <Button onClick={updateBubble} className="w-full">
+                                <Button
+                                  onClick={updateBubble}
+                                  className="w-full"
+                                >
                                   <Save className="mr-2 h-4 w-4" />
                                   Save All Changes
                                 </Button>
                               </div>
                             </DialogContent>
                           </Dialog>
-                          <Button variant="outline" size="sm" onClick={() => deleteBubble(bubble.bubble_id)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteBubble(bubble.bubble_id)}
+                          >
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">Original:</p>
-                          <p className="text-sm">{bubble.text || "No text detected"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Original:
+                          </p>
+                          <p className="text-sm">
+                            {bubble.text || "No text detected"}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">Translation:</p>
-                          <p className="text-sm">{bubble.translation || "No translation"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Translation:
+                          </p>
+                          <p className="text-sm">
+                            {bubble.translation || "No translation"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -486,7 +557,9 @@ export function ComicEditorSidebar({
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Create Speech Bubble</DialogTitle>
-                      <DialogDescription>Add a new speech bubble to this page</DialogDescription>
+                      <DialogDescription>
+                        Add a new speech bubble to this page
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
@@ -494,16 +567,28 @@ export function ComicEditorSidebar({
                         <Textarea
                           id="new-bubble-text"
                           value={newBubbleData.text}
-                          onChange={(e) => setNewBubbleData((prev) => ({ ...prev, text: e.target.value }))}
+                          onChange={(e) =>
+                            setNewBubbleData((prev) => ({
+                              ...prev,
+                              text: e.target.value,
+                            }))
+                          }
                           placeholder="Enter text"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="new-bubble-translation">Translation</Label>
+                        <Label htmlFor="new-bubble-translation">
+                          Translation
+                        </Label>
                         <Textarea
                           id="new-bubble-translation"
                           value={newBubbleData.translation}
-                          onChange={(e) => setNewBubbleData((prev) => ({ ...prev, translation: e.target.value }))}
+                          onChange={(e) =>
+                            setNewBubbleData((prev) => ({
+                              ...prev,
+                              translation: e.target.value,
+                            }))
+                          }
                           placeholder="Enter translation"
                         />
                       </div>
@@ -520,5 +605,5 @@ export function ComicEditorSidebar({
         </Card>
       )}
     </div>
-  )
+  );
 }
