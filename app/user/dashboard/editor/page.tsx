@@ -20,7 +20,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
-import { Edit, Plus, Minus, ImageIcon, EyeOff, RefreshCw } from "lucide-react";
+import {
+  Edit,
+  Plus,
+  Minus,
+  ImageIcon,
+  EyeOff,
+  RefreshCw,
+  Maximize,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComicEditorSidebar } from "@/components/comic-editor-sidebar";
 import { useTaskContext } from "@/components/TaskContext";
@@ -63,6 +71,7 @@ export default function EditorPage() {
   const [files, setFiles] = useState<FileData[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [pages, setPages] = useState<PageData[]>([]);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [sections, setSections] = useState<EditorSection[]>([
     { id: "section-1", name: "Section 1", selectedState: "image" },
   ]);
@@ -75,6 +84,10 @@ export default function EditorPage() {
   useEffect(() => {
     fetchFiles();
   }, []);
+
+  const handleMaximize = () => {
+    setIsMaximized((prev) => !prev);
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -327,7 +340,14 @@ export default function EditorPage() {
       </Card>
 
       {selectedFileId && pages.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div
+          className={`${
+            isMaximized
+              ? "fixed top-0 left-0 w-screen h-screen bg-white z-50 overflow-hidden grid grid-cols-4 gap-0"
+              : "grid grid-cols-1 lg:grid-cols-4 gap-6"
+          }`}
+        >
+          {" "}
           <div className="lg:col-span-3">
             <Card>
               <CardHeader>
@@ -337,6 +357,9 @@ export default function EditorPage() {
                     Editor Sections
                   </CardTitle>
                   <div className="flex gap-2">
+                    <Button onClick={handleMaximize} size="sm">
+                      <Maximize className="h-4 w-4" />
+                    </Button>
                     <Button onClick={addSection} size="sm">
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -457,7 +480,6 @@ export default function EditorPage() {
               </CardContent>
             </Card>
           </div>
-
           <div className="lg:col-span-1">
             <Tabs defaultValue="editor" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
