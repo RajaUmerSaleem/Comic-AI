@@ -33,6 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTaskContext } from "@/components/TaskContext"; // adjust the path if needed
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +78,7 @@ export default function FilesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+const { addTask } = useTaskContext();
 
   useEffect(() => {
     const token = localStorage.getItem("userToken");
@@ -90,7 +93,6 @@ export default function FilesPage() {
     try {
       const token = localStorage.getItem("userToken");
       const response: FilesResponse = await apiRequest("/v1/file/", {}, token!);
-      console.log("API Response:", response);
       setFiles(response.files || []);
     } catch (error: any) {
       toast({
@@ -129,7 +131,6 @@ export default function FilesPage() {
     try {
       const token = localStorage.getItem("userToken");
       const response = await uploadFile("/v1/file/", selectedFile, token!);
-      console.log("Upload Response:", response);
 
       toast({
         title: "Success",
@@ -195,7 +196,6 @@ export default function FilesPage() {
           token!
         );
 
-        console.log("Task Status Response:", response);
 
         if (response.status === "COMPLETED" || response.status === "FAILED") {
           // Update the file status in the local state
@@ -207,7 +207,7 @@ export default function FilesPage() {
 
           toast({
             title: response.status === "COMPLETED" ? "Success" : "Error",
-            description: `Image extraction for "${filename}" ${
+            description: `Image extraction ${
               response.status === "COMPLETED" ? "completed" : "failed"
             }.`,
             variant: response.status === "COMPLETED" ? "default" : "destructive",
@@ -231,47 +231,52 @@ export default function FilesPage() {
     // If max attempts are reached
     toast({
       title: "Error",
-      description: `Task status check timed out for "${filename}".`,
+      description: `Task status check timed out !!!.`,
       variant: "destructive",
     });
   };
 
   const convertFile = async (fileId: number, filename: string) => {
-    try {
-      const token = localStorage.getItem("userToken");
-      const response: TaskResponse = await apiRequest(
-        `/v1/file/async-images-from-pdf?file_id=${fileId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+  try {
+    const token = localStorage.getItem("userToken");
+    const response: TaskResponse = await apiRequest(
+      `/v1/file/async-images-from-pdf?file_id=${fileId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        token!
+      },
+      token!
+    );
+
+    toast({
+      title: "Success",
+      description: `Image extraction started!`,
+    });
+
+    // ✅ Save task to TaskContext
+    if (response.task_id) {
+      addTask(`convert-${fileId}`, response.task_id); // ✅ Store taskId in context
+
+      // Optional: update status in local state
+      setFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.id === fileId ? { ...file, status: response.status } : file
+        )
       );
 
-      toast({
-        title: "Success",
-        description: `Image extraction started for "${filename}"`,
-      });
-
-      // Extract task_id and start polling
-      if (response.task_id) {
-        setFiles((prevFiles) =>
-          prevFiles.map((file) =>
-            file.id === fileId ? { ...file, status: response.status } : file
-          )
-        );
-        pollTaskStatus(response.task_id, fileId, filename);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to initiate image extraction",
-        variant: "destructive",
-      });
+      pollTaskStatus(response.task_id, fileId, filename);
     }
-  };
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message || "Failed to initiate image extraction",
+      variant: "destructive",
+    });
+  }
+};
+
 
   const handleViewFile = (file_path: string, filename: string) => {
     try {
