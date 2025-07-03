@@ -77,6 +77,32 @@ export default function EditorPage() {
   }, []);
 
   useEffect(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const pageId = entry.target.getAttribute("data-page-id");
+          if (pageId) {
+            setSelectedPageId(Number(pageId));
+          }
+        }
+      });
+    },
+    {
+      root: null,
+      threshold: 0.6, // Trigger when 60% of a page is in view
+    }
+  );
+
+  const pageElements = document.querySelectorAll("[data-page-id]");
+  pageElements.forEach((el) => observer.observe(el));
+
+  return () => {
+    pageElements.forEach((el) => observer.unobserve(el));
+  };
+}, [pages]);
+
+  useEffect(() => {
     if (selectedFileId) {
       fetchPages(selectedFileId);
     }
@@ -435,6 +461,7 @@ export default function EditorPage() {
                                     return (
                                       <div
                                         key={`${section.id}-${page.page_id}`}
+                                          data-page-id={page.page_id} // 👈 Add this line
                                         className="snap-start h-full flex-shrink-0 mb-4"
                                       >
                                         <div className="flex items-center justify-between mb-2">
@@ -450,7 +477,7 @@ export default function EditorPage() {
                                           <img
                                             src={imageUrl || "/placeholder.svg"}
                                             alt={`Page ${page.page_number}`}
-                                            className="w-full h-auto cursor-pointer hover:opacity-80 rounded"
+                                            className="w-full h-auto cursor-pointer rounded"
                                             onClick={() =>
                                               setSelectedPageId(page.page_id)
                                             }
