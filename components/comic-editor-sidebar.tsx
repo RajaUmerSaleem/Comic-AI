@@ -119,61 +119,6 @@ export function ComicEditorSidebar({
     }
   };
 
-  const translateBubbles = async () => {
-    if (!selectedFileId) return;
-    try {
-      await apiRequest(
-        `/v1/file/async-translate?file_id=${selectedFileId}`,
-        { method: "POST" },
-        token!
-      );
-      toast({
-        title: "Success",
-        description: "Translation started successfully",
-      });
-      onPagesUpdate();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateBubble = async () => {
-    if (!editingBubble) return;
-    try {
-      await apiRequest(
-        `/v1/pages/bubble/${editingBubble.bubble_id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            coordinates_xyxy: editingBubble.coordinates_xyxy,
-            mask_coordinates_xyxy: editingBubble.mask_coordinates_xyxy,
-            text: bubbleText,
-            translation: bubbleTranslation,
-          }),
-        },
-        token!
-      );
-      toast({
-        title: "Success",
-        description: "Speech bubble updated successfully",
-      });
-      setEditingBubble(null);
-      setBubbleText("");
-      setBubbleTranslation("");
-      onPagesUpdate();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const createBubble = async () => {
     if (!selectedPageId) return;
     try {
@@ -559,7 +504,8 @@ export function ComicEditorSidebar({
                     >
                       <div className="flex justify-between items-start mb-2">
                         <Badge variant="secondary">
-                          Bubble #{bubble.bubble_no}
+                          Bubble #{bubble.bubble_no} (Page{" "}
+                          {selectedPage.page_number}, Box {bubble.bubble_no})
                         </Badge>
                         <Button
                           variant="outline"
