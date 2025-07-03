@@ -41,6 +41,8 @@ interface SpeechBubble {
   mask_coordinates_xyxy: number[][];
   text: string;
   translation: string;
+  font_size?: number;
+  font_color?: string;
 }
 
 interface PageData {
@@ -234,7 +236,9 @@ export function ComicEditorSidebar({
   const updateBubbleTranslation = async (
     pageId: number,
     bubbleId: number,
-    translation: string
+    translation: string,
+    font_size?: number,
+    font_color?: string
   ) => {
     try {
       await apiRequest(
@@ -244,7 +248,14 @@ export function ComicEditorSidebar({
           body: JSON.stringify({
             page_id: pageId,
             font_id: 1,
-            bubble_data: [{ bubble_id: bubbleId, translation }],
+            bubble_data: [
+              {
+                bubble_id: bubbleId,
+                translation,
+                font_size,
+                font_color,
+              },
+            ],
           }),
         },
         token!
@@ -259,30 +270,32 @@ export function ComicEditorSidebar({
       });
     }
   };
- const updateBubbleText = async (
-  pageId: number,
-  bubbleId: number,
-  text: string
-) => {
-  try {
-    await apiRequest(
-      `/v1/pages/${pageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
-      {
-        method: "PUT",
-      },
-      token!
-    );
-    toast({ title: "Success", description: "Text updated" });
-    onPagesUpdate();
-  } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message,
-      variant: "destructive",
-    });
-  }
-};
 
+  const updateBubbleText = async (
+    pageId: number,
+    bubbleId: number,
+    text: string
+  ) => {
+    try {
+      await apiRequest(
+        `/v1/pages/${pageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(
+          text
+        )}`,
+        {
+          method: "PUT",
+        },
+        token!
+      );
+      toast({ title: "Success", description: "Text updated" });
+      onPagesUpdate();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const isProcessing = (type: string) => {
     const taskKey = selectedPageId
@@ -586,6 +599,43 @@ export function ComicEditorSidebar({
                             )
                           }
                         />
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col w-1/2">
+                            <Label className="text-xs">Font Size</Label>
+                            <input
+                              type="number"
+                              className="border rounded px-2 py-1 text-sm"
+                              defaultValue={bubble.font_size || 12}
+                              onBlur={(e) =>
+                                updateBubbleTranslation(
+                                  selectedPage.page_id,
+                                  bubble.bubble_id,
+                                  bubble.translation,
+                                  Number(e.target.value),
+                                  bubble.font_color || "#000000"
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="flex flex-col w-1/2">
+                            <Label className="text-xs">Font Color</Label>
+                            <input
+                              type="color"
+                              className="h-9 rounded"
+                              defaultValue={bubble.font_color || "#000000"}
+                              onBlur={(e) =>
+                                updateBubbleTranslation(
+                                  selectedPage.page_id,
+                                  bubble.bubble_id,
+                                  bubble.translation,
+                                  bubble.font_size || 12,
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
