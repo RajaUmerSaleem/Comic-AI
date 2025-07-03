@@ -291,7 +291,7 @@ export function ComicEditorSidebar({
                   className="w-full"
                 >
                   <Eye className="mr-2 h-4 w-4" />
-                  Detect Current Page
+                  Detect Current Page ({selectedPage?.page_number} )
                 </Button>
               )}
             </div>
@@ -315,7 +315,7 @@ export function ComicEditorSidebar({
                   className="w-full text-sm "
                 >
                   <EyeOff className="mr-1 h-4 w-4" />
-                  Remove Text Current Page
+                  Remove Text Current Page ({selectedPage?.page_number} )
                 </Button>
               )}
             </div>
@@ -409,7 +409,7 @@ export function ComicEditorSidebar({
                       className="w-full"
                     >
                       <MessageSquare className="mr-2 h-4 w-4" />
-                      Translate Current Page
+                      Translate Current Page ({selectedPage?.page_number} )
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
