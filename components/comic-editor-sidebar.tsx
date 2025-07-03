@@ -78,6 +78,8 @@ export function ComicEditorSidebar({
   const { token } = useAuth();
   const [editingBubble, setEditingBubble] = useState<SpeechBubble | null>(null);
   const [bubbleText, setBubbleText] = useState("");
+  const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] =
+    useState(false);
   const [bubbleTranslation, setBubbleTranslation] = useState("");
   const [fonts, setFonts] = useState<{ id: number; name: string }[]>([]);
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null);
@@ -257,6 +259,30 @@ export function ComicEditorSidebar({
       });
     }
   };
+ const updateBubbleText = async (
+  pageId: number,
+  bubbleId: number,
+  text: string
+) => {
+  try {
+    await apiRequest(
+      `/v1/pages/${pageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
+      {
+        method: "PUT",
+      },
+      token!
+    );
+    toast({ title: "Success", description: "Text updated" });
+    onPagesUpdate();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message,
+      variant: "destructive",
+    });
+  }
+};
+
 
   const isProcessing = (type: string) => {
     const taskKey = selectedPageId
@@ -279,122 +305,216 @@ export function ComicEditorSidebar({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
-              onClick={() => onDetectionStart()}
-              disabled={!selectedFileId || isProcessing("detect")}
-              className="w-full"
-            >
-              {isProcessing("detect") ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Detecting...
-                </>
-              ) : (
-                <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Detect All Pages
-                </>
-              )}
-            </Button>
-
-            {selectedPageId && (
+            {/* Detect Buttons Group */}
+            <div className="border rounded p-3 space-y-3">
               <Button
-                onClick={() => onDetectionStart(selectedPageId)}
-                disabled={isProcessing("detect")}
-                variant="outline"
+                onClick={() => onDetectionStart()}
+                disabled={!selectedFileId || isProcessing("detect")}
                 className="w-full"
               >
-                <Eye className="mr-2 h-4 w-4" />
-                Detect Current Page
+                {isProcessing("detect") ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Detect All Pages
+                  </>
+                )}
               </Button>
-            )}
 
-            <Button
-              onClick={() => onTextRemovalStart()}
-              disabled={!selectedFileId || isProcessing("remove")}
-              className="w-full"
-            >
-              <EyeOff className="mr-2 h-4 w-4" />
-              Remove Text All Pages
-            </Button>
-
-            {selectedPageId && (
-              <Button
-                onClick={() => onTextRemovalStart(selectedPageId)}
-                disabled={isProcessing("remove")}
-                variant="outline"
-                className="w-full"
-              >
-                <EyeOff className="mr-1 h-4 w-4" />
-                Remove Text Current Page
-              </Button>
-            )}
-
-            <Dialog open={isFontDialogOpen} onOpenChange={setIsFontDialogOpen}>
-              <DialogTrigger asChild>
+              {selectedPageId && (
                 <Button
-                  onClick={() => {
-                    fetchFonts();
-                    setIsFontDialogOpen(true);
-                  }}
-                  disabled={!selectedFileId || isProcessing("translate")}
+                  onClick={() => onDetectionStart(selectedPageId)}
+                  disabled={isProcessing("detect")}
+                  variant="outline"
                   className="w-full"
                 >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Translate Bubbles
+                  <Eye className="mr-2 h-4 w-4" />
+                  Detect Current Page
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Select Font for Translation</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Label htmlFor="font-select">Choose Font</Label>
-                  <select
-                    id="font-select"
-                    className="w-full border p-2 rounded"
-                    value={selectedFontId ?? ""}
-                    onChange={(e) => setSelectedFontId(Number(e.target.value))}
-                  >
-                    <option value="" disabled>
-                      Select a font
-                    </option>
-                    {fonts.map((font) => (
-                      <option key={font.id} value={font.id}>
-                        {font.name}
-                      </option>
-                    ))}
-                  </select>
+              )}
+            </div>
+
+            {/* Remove Text Buttons Group */}
+            <div className="border rounded p-3 space-y-3">
+              <Button
+                onClick={() => onTextRemovalStart()}
+                disabled={!selectedFileId || isProcessing("remove")}
+                className="w-full"
+              >
+                <EyeOff className="mr-2 h-4 w-4" />
+                Remove Text All Pages
+              </Button>
+
+              {selectedPageId && (
+                <Button
+                  onClick={() => onTextRemovalStart(selectedPageId)}
+                  disabled={isProcessing("remove")}
+                  variant="outline"
+                  className="w-full text-sm "
+                >
+                  <EyeOff className="mr-1 h-4 w-4" />
+                  Remove Text Current Page
+                </Button>
+              )}
+            </div>
+
+            <div className="border rounded p-3 space-y-3">
+              <Dialog
+                open={isFontDialogOpen}
+                onOpenChange={setIsFontDialogOpen}
+              >
+                <DialogTrigger asChild>
                   <Button
-                    onClick={async () => {
-                      if (!selectedFileId || !selectedFontId) return;
-                      try {
-                        await apiRequest(
-                          `/v1/file/async-translate?file_id=${selectedFileId}&font_id=${selectedFontId}`,
-                          { method: "POST" },
-                          token!
-                        );
-                        toast({
-                          title: "Success",
-                          description: "Translation started",
-                        });
-                        onPagesUpdate();
-                        setIsFontDialogOpen(false);
-                      } catch (error: any) {
-                        toast({
-                          title: "Error",
-                          description: error.message,
-                          variant: "destructive",
-                        });
-                      }
+                    onClick={() => {
+                      fetchFonts();
+                      setIsFontDialogOpen(true);
                     }}
+                    disabled={!selectedFileId || isProcessing("translate")}
                     className="w-full"
                   >
-                    Save and Translate
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Translate All Bubbles
                   </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Select Font for Translation</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Label htmlFor="font-select">Choose Font</Label>
+                    <select
+                      id="font-select"
+                      className="w-full border p-2 rounded"
+                      value={selectedFontId ?? ""}
+                      onChange={(e) =>
+                        setSelectedFontId(Number(e.target.value))
+                      }
+                    >
+                      <option value="" disabled>
+                        Select a font
+                      </option>
+                      {fonts.map((font) => (
+                        <option key={font.id} value={font.id}>
+                          {font.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      onClick={async () => {
+                        if (!selectedFileId || !selectedFontId) return;
+                        try {
+                          await apiRequest(
+                            `/v1/file/async-translate?file_id=${selectedFileId}&font_id=${selectedFontId}`,
+                            { method: "POST" },
+                            token!
+                          );
+                          toast({
+                            title: "Success",
+                            description: "Translation started for all pages",
+                          });
+                          setIsFontDialogOpen(false);
+                          onPagesUpdate();
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Save and Translate All
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Translate Current Page Button */}
+              {selectedPageId && (
+                <Dialog
+                  open={isSinglePageTranslateDialogOpen}
+                  onOpenChange={setIsSinglePageTranslateDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => {
+                        fetchFonts();
+                        setIsSinglePageTranslateDialogOpen(true);
+                      }}
+                      disabled={isProcessing("translate")}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Translate Current Page
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Select Font for Current Page</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Label htmlFor="font-select-single">Choose Font</Label>
+                      <select
+                        id="font-select-single"
+                        className="w-full border p-2 rounded"
+                        value={selectedFontId ?? ""}
+                        onChange={(e) =>
+                          setSelectedFontId(Number(e.target.value))
+                        }
+                      >
+                        <option value="" disabled>
+                          Select a font
+                        </option>
+                        {fonts.map((font) => (
+                          <option key={font.id} value={font.id}>
+                            {font.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        onClick={async () => {
+                          if (
+                            !selectedFileId ||
+                            !selectedPageId ||
+                            !selectedFontId
+                          )
+                            return;
+                          try {
+                            await apiRequest(
+                              `/v1/file/async-translate?file_id=${selectedFileId}&font_id=${selectedFontId}&page_id=${selectedPageId}`,
+                              { method: "POST" },
+                              token!
+                            );
+                            toast({
+                              title: "Success",
+                              description:
+                                "Translation started for current page",
+                            });
+                            setIsSinglePageTranslateDialogOpen(false);
+                            onPagesUpdate();
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message,
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        Save and Translate Page
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -438,11 +558,20 @@ export function ComicEditorSidebar({
                       </div>
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">
-                          Original:
+                          Original Text:
                         </p>
-                        <p className="text-sm">
-                          {bubble.text || "No text detected"}
-                        </p>
+                        <Textarea
+                          className="text-sm"
+                          defaultValue={bubble.text}
+                          onBlur={(e) =>
+                            updateBubbleText(
+                              selectedPage.page_id,
+                              bubble.bubble_id,
+                              e.target.value
+                            )
+                          }
+                        />
+
                         <p className="text-xs font-medium text-muted-foreground">
                           Translation:
                         </p>
@@ -461,6 +590,7 @@ export function ComicEditorSidebar({
                     </div>
                   ))
                 )}
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full bg-transparent">
