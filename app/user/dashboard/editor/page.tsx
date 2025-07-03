@@ -346,8 +346,8 @@ export default function EditorPage() {
         <div
           className={`${
             isMaximized
-              ? "fixed top-0 left-0 w-screen h-screen bg-white z-50 overflow-hidden grid grid-cols-4 gap-0"
-              : "grid grid-cols-1 lg:grid-cols-4 gap-6"
+              ? "fixed top-0 left-0 w-screen  h-screen bg-white z-50 overflow-hidden grid grid-cols-4 gap-0"
+              : "grid grid-cols-1 lg:grid-cols-4 p-4 gap-8"
           }`}
         >
           {" "}
@@ -490,7 +490,7 @@ export default function EditorPage() {
               </CardContent>
             </Card>
           </div>
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 ">
             <Tabs defaultValue="editor" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="editor">Editor</TabsTrigger>
