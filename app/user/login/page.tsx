@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
 import { LogIn, Mail, Lock } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 export default function UserLoginPage() {
   const [formData, setFormData] = useState({
@@ -19,6 +20,8 @@ export default function UserLoginPage() {
     password: "",
   })
   const [isLoading, setIsLoading] = useState(false)
+  const { login } = useAuth()
+
   const router = useRouter()
   const { toast } = useToast()
 
@@ -33,22 +36,20 @@ export default function UserLoginPage() {
       })
 
       if (response.access_token) {
-        localStorage.setItem("userToken", response.access_token)
+  try {
+    const profileResponse = await apiRequest("/v1/auth/profile", {}, response.access_token)
+    login(response.access_token, profileResponse) // this sets token + user + localStorage
+  } catch (profileError) {
+    console.error("Failed to fetch user profile:", profileError)
+  }
 
-        // Fetch user profile after login
-        try {
-          const profileResponse = await apiRequest("/v1/auth/profile", {}, response.access_token)
-          localStorage.setItem("userProfile", JSON.stringify(profileResponse))
-        } catch (profileError) {
-          console.error("Failed to fetch user profile:", profileError)
-        }
+  toast({
+    title: "Success",
+    description: "Login successful!",
+  })
 
-        toast({
-          title: "Success",
-          description: "Login successful!",
-        })
-        router.push("/user/dashboard")
-      }
+  router.push("/user/dashboard")
+}
     } catch (error: any) {
       toast({
         title: "Error",
@@ -87,7 +88,7 @@ export default function UserLoginPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="john@example.com"
+                  placeholder="johndoe@example.com"
                   value={formData.email}
                   onChange={handleChange}
                   className="pl-10"

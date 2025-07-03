@@ -4,11 +4,22 @@ import { useAuth } from "@/components/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Upload, Edit, User, Building2, Calendar } from "lucide-react"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+ const { user, isLoading } = useAuth()
+   const router = useRouter()
 
-  if (!user) return null
+ useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/user/login")
+    }
+  }, [isLoading, user, router])
+
+  if (isLoading || !user) {
+    return <div className="text-center py-20">Loading...</div>
+  }
 
   return (
     <div className="space-y-6">
