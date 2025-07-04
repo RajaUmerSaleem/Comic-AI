@@ -392,7 +392,6 @@ export function ComicEditorSidebar({
                 </DialogContent>
               </Dialog>
 
-              {/* Translate Current Page Button */}
               {selectedPageId && (
                 <Dialog
                   open={isSinglePageTranslateDialogOpen}
