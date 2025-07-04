@@ -353,7 +353,7 @@ export default function EditorPage() {
           {" "}
           <div className="lg:col-span-3">
             <Card>
-              <CardHeader >
+              <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="flex items-center">
                     <Edit className="mr-2 h-5 w-5" />
@@ -491,42 +491,42 @@ export default function EditorPage() {
             </Card>
           </div>
           <div className="lg:col-span-1 ">
-          <div className="h-full border rounded-xl">
+            <div className="h-full border rounded-xl">
               <Tabs defaultValue="editor" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="editor">Editor</TabsTrigger>
-                <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
-              </TabsList>
-              <TabsContent value="editor" className="border-none">
-                <ComicEditorSidebar
-                  selectedFileId={selectedFileId}
-                  selectedPageId={selectedPageId}
-                  pages={pages}
-                  onDetectionStart={startDetection}
-                  onTextRemovalStart={startTextRemoval}
-                  onPagesUpdate={() =>
-                    selectedFileId && fetchPages(selectedFileId)
-                  }
-                  processingTasks={processingTasks}
-                  mode="editor" // 👈 Only show buttons
-                />
-              </TabsContent>
-              <TabsContent value="bubbles">
-                <ComicEditorSidebar
-                  selectedFileId={selectedFileId}
-                  selectedPageId={selectedPageId}
-                  pages={pages}
-                  onDetectionStart={startDetection}
-                  onTextRemovalStart={startTextRemoval}
-                  onPagesUpdate={() =>
-                    selectedFileId && fetchPages(selectedFileId)
-                  }
-                  processingTasks={processingTasks}
-                  mode="bubbles" // 👈 Only show speech bubbles
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="editor">Editor</TabsTrigger>
+                  <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
+                </TabsList>
+                <TabsContent value="editor" className="border-none">
+                  <ComicEditorSidebar
+                    selectedFileId={selectedFileId}
+                    selectedPageId={selectedPageId}
+                    pages={pages}
+                    onDetectionStart={startDetection}
+                    onTextRemovalStart={startTextRemoval}
+                    onPagesUpdate={() =>
+                      selectedFileId && fetchPages(selectedFileId)
+                    }
+                    processingTasks={processingTasks}
+                    mode="editor" // 👈 Only show buttons
+                  />
+                </TabsContent>
+                <TabsContent value="bubbles">
+                  <ComicEditorSidebar
+                    selectedFileId={selectedFileId}
+                    selectedPageId={selectedPageId}
+                    pages={pages}
+                    onDetectionStart={startDetection}
+                    onTextRemovalStart={startTextRemoval}
+                    onPagesUpdate={() =>
+                      selectedFileId && fetchPages(selectedFileId)
+                    }
+                    processingTasks={processingTasks}
+                    mode="bubbles" // 👈 Only show speech bubbles
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
         </div>
       )}
