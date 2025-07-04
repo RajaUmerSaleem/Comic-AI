@@ -1,4 +1,4 @@
-# Vibrant Comic AI UI
+# Vibrant Comic AI UI Part 1
 
 *Automatically synced with your [v0.dev](https://v0.dev) deployments*
 
