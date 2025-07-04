@@ -353,7 +353,7 @@ export default function EditorPage() {
           {" "}
           <div className="lg:col-span-3">
             <Card>
-              <CardHeader>
+              <CardHeader >
                 <div className="flex justify-between items-center">
                   <CardTitle className="flex items-center">
                     <Edit className="mr-2 h-5 w-5" />
