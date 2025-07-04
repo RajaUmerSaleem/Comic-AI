@@ -491,12 +491,13 @@ export default function EditorPage() {
             </Card>
           </div>
           <div className="lg:col-span-1 ">
-            <Tabs defaultValue="editor" className="w-full">
+          <div className="h-full border rounded-xl">
+              <Tabs defaultValue="editor" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="editor">Editor</TabsTrigger>
                 <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
               </TabsList>
-              <TabsContent value="editor">
+              <TabsContent value="editor" className="border-none">
                 <ComicEditorSidebar
                   selectedFileId={selectedFileId}
                   selectedPageId={selectedPageId}
@@ -525,6 +526,7 @@ export default function EditorPage() {
                 />
               </TabsContent>
             </Tabs>
+          </div>
           </div>
         </div>
       )}

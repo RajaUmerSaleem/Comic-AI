@@ -252,7 +252,7 @@ export function ComicEditorSidebar({
   return (
     <div className="space-y-4 ">
       {mode === "editor" && (
-        <Card className="h-[89vh]">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <Zap className="mr-2 h-4 w-4" />
