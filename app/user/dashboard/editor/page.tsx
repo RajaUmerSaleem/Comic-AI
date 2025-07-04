@@ -438,7 +438,7 @@ export default function EditorPage() {
                                   <div
                                     key={`${section.id}-${page.page_id}`}
                                     data-page-id={page.page_id}
-                                    className="snap-start h-full flex-shrink-0 mb-4"
+                                    className="snap-start flex-shrink-0 mb-4"
                                   >
                                     <div className="flex items-center justify-between mb-2">
                                       <span className="text-sm font-medium">
