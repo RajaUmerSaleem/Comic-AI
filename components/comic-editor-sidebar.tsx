@@ -584,7 +584,7 @@ export function ComicEditorSidebar({
                                 updateBubbleTranslation(
                                   selectedPage.page_id,
                                   bubble.bubble_id,
-                                  bubble.translation,
+                                  bubble.translation ?? "",
                                   bubble.font_size || 12,
                                   e.target.value
                                 )
