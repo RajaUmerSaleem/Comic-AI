@@ -92,31 +92,60 @@ export default function EditorPage() {
     setIsMaximized((prev) => !prev);
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  const observers: IntersectionObserver[] = [];
+  const visibilityMap = new Map<number, number>(); // pageId => intersectionRatio
+
+  const updateMostVisiblePage = () => {
+    let maxRatio = 0;
+    let mostVisiblePageId: number | null = null;
+
+    for (const [pageId, ratio] of visibilityMap.entries()) {
+      if (ratio > maxRatio) {
+        maxRatio = ratio;
+        mostVisiblePageId = pageId;
+      }
+    }
+
+    if (mostVisiblePageId !== null) {
+      setSelectedPageId(mostVisiblePageId);
+    }
+  };
+
+  sections.forEach((section) => {
+    const scrollEl = scrollRefs.current[section.id];
+    if (!scrollEl) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const pageId = entry.target.getAttribute("data-page-id");
-            if (pageId) {
-              setSelectedPageId(Number(pageId));
-            }
-          }
+          const pageIdAttr = entry.target.getAttribute("data-page-id");
+          if (!pageIdAttr) return;
+
+          const pageId = Number(pageIdAttr);
+          visibilityMap.set(pageId, entry.intersectionRatio);
+
+          updateMostVisiblePage();
         });
       },
       {
-        root: null,
-        threshold: 0.6, // Trigger when 60% of a page is in view
+        root: scrollEl,
+        threshold: [0, 0.25, 0.5, 0.75, 1], // observe all levels of visibility
       }
     );
 
-    const pageElements = document.querySelectorAll("[data-page-id]");
-    pageElements.forEach((el) => observer.observe(el));
+    const pageEls = scrollEl.querySelectorAll("[data-page-id]");
+    pageEls.forEach((el) => observer.observe(el));
 
-    return () => {
-      pageElements.forEach((el) => observer.unobserve(el));
-    };
-  }, [pages]);
+    observers.push(observer);
+  });
+
+  return () => {
+    observers.forEach((observer) => observer.disconnect());
+  };
+}, [pages, sections]);
+
+
 
   useEffect(() => {
     if (selectedFileId) {
@@ -438,7 +467,7 @@ export default function EditorPage() {
                                   <div
                                     key={`${section.id}-${page.page_id}`}
                                     data-page-id={page.page_id}
-                                    className="snap-start flex-shrink-0 mb-4"
+                                    className="snap-start h-auto flex-shrink-0 mb-4"
                                   >
                                     <div className="flex items-center justify-between mb-2">
                                       <span className="text-sm font-medium">
