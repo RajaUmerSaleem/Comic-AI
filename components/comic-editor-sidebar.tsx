@@ -259,6 +259,19 @@ export function ComicEditorSidebar({
       : `${type}-${selectedFileId}`;
     return processingTasks.has(taskKey);
   };
+  function rgbArrayToHex(rgb: number[]): string {
+  if (rgb.length !== 3) return "#000000";
+  return (
+    "#" +
+    rgb
+      .map((x) => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      })
+      .join("")
+  );
+}
+
 
   return (
     <div className="space-y-4 ">
@@ -579,7 +592,11 @@ export function ComicEditorSidebar({
                             <input
                               type="color"
                               className="h-9 rounded"
-                              defaultValue={bubble.font_color || "#000000"}
+                              defaultValue={
+                                Array.isArray(bubble.font_color)
+                                  ? rgbArrayToHex(bubble.font_color)
+                                  : bubble.font_color || "#000000"
+                              }
                               onBlur={(e) =>
                                 updateBubbleTranslation(
                                   selectedPage.page_id,
