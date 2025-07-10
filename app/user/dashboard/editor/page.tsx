@@ -291,6 +291,51 @@ export default function EditorPage() {
     // The sidebar will handle the actual bubble creation
   }
 
+  const handleBubbleTextUpdate = async (bubbleId: number, text: string, translation: string) => {
+    if (!selectedPageId) return
+
+    try {
+      // Update text
+      await apiRequest(
+        `/v1/pages/${selectedPageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
+        { method: "PUT" },
+        token!,
+      )
+
+      // Update translation
+      await apiRequest(
+        `/v1/pages/${selectedPageId}/bubble/${bubbleId}/translation`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            page_id: selectedPageId,
+            font_id: 1,
+            bubble_data: [
+              {
+                bubble_id: bubbleId,
+                translation,
+              },
+            ],
+          }),
+        },
+        token!,
+      )
+
+      toast({ title: "Success", description: "Bubble updated successfully" })
+
+      // Refresh pages
+      if (selectedFileId) {
+        fetchPages(selectedFileId)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -423,6 +468,7 @@ export default function EditorPage() {
                                         selectedBubbleId={selectedBubbleId}
                                         isAddingBubble={isAddingBubble}
                                         onPolygonSelect={handlePolygonSelect}
+                                        onBubbleTextUpdate={handleBubbleTextUpdate}
                                       />
                                     ) : (
                                       <img

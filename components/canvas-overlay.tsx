@@ -23,6 +23,7 @@ interface CanvasOverlayProps {
   selectedBubbleId?: number | null
   isAddingBubble?: boolean
   onPolygonSelect?: (coordinates: number[][]) => void
+  onBubbleTextUpdate?: (bubbleId: number, text: string, translation: string) => void
 }
 
 export function CanvasOverlay({
@@ -33,11 +34,16 @@ export function CanvasOverlay({
   selectedBubbleId,
   isAddingBubble = false,
   onPolygonSelect,
+  onBubbleTextUpdate,
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [polygonPoints, setPolygonPoints] = useState<number[][]>([])
+  const [editingBubble, setEditingBubble] = useState<number | null>(null)
+  const [editText, setEditText] = useState("")
+  const [editTranslation, setEditTranslation] = useState("")
+  const [editBounds, setEditBounds] = useState({ x: 0, y: 0, width: 0, height: 0 })
 
   const isPointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
     const [x, y] = point
@@ -61,11 +67,12 @@ export function CanvasOverlay({
     }
 
     const isSelected = selectedBubbleId === bubble.bubble_id
+    const isEditing = editingBubble === bubble.bubble_id
 
     // Draw polygon outline
     ctx.beginPath()
-    ctx.strokeStyle = isSelected ? "#ef4444" : "#3b82f6"
-    ctx.lineWidth = isSelected ? 3 : 2
+    ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : "#3b82f6"
+    ctx.lineWidth = isSelected ? 3 : isEditing ? 3 : 2
 
     const firstPoint = bubble.mask_coordinates[0]
     ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
@@ -79,8 +86,17 @@ export function CanvasOverlay({
     ctx.stroke()
 
     // Fill polygon with semi-transparent background
-    ctx.fillStyle = isSelected ? "rgba(239, 68, 68, 0.1)" : "rgba(255, 255, 255, 0.9)"
+    ctx.fillStyle = isSelected
+      ? "rgba(239, 68, 68, 0.1)"
+      : isEditing
+        ? "rgba(16, 185, 129, 0.1)"
+        : "rgba(255, 255, 255, 0.9)"
     ctx.fill()
+
+    // Don't draw text if currently editing this bubble
+    if (isEditing) {
+      return
+    }
 
     // Draw translation text if available
     const textToShow = bubble.translation || bubble.text
@@ -161,7 +177,7 @@ export function CanvasOverlay({
 
     // Draw bubble number
     ctx.font = `${Math.max(10, 12 * Math.min(scaleX, scaleY))}px Arial`
-    ctx.fillStyle = isSelected ? "#ef4444" : "#3b82f6"
+    ctx.fillStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : "#3b82f6"
     ctx.strokeStyle = "white"
     ctx.lineWidth = 2
     const numberText = `#${bubble.bubble_no}`
@@ -206,11 +222,51 @@ export function CanvasOverlay({
     for (const bubble of speechBubbles) {
       if (bubble.mask_coordinates && bubble.mask_coordinates.length > 0) {
         if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
-          onBubbleClick?.(bubble)
+          // Double click to edit
+          if (event.detail === 2) {
+            // Calculate polygon bounds for positioning edit fields
+            let minX = Number.POSITIVE_INFINITY,
+              maxX = Number.NEGATIVE_INFINITY,
+              minY = Number.POSITIVE_INFINITY,
+              maxY = Number.NEGATIVE_INFINITY
+            for (const point of bubble.mask_coordinates) {
+              minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
+              maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
+              minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
+              maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
+            }
+
+            setEditingBubble(bubble.bubble_id)
+            setEditText(bubble.text)
+            setEditTranslation(bubble.translation || "")
+            setEditBounds({
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            })
+          } else {
+            onBubbleClick?.(bubble)
+          }
           return
         }
       }
     }
+  }
+
+  const handleSaveEdit = () => {
+    if (editingBubble && onBubbleTextUpdate) {
+      onBubbleTextUpdate(editingBubble, editText, editTranslation)
+    }
+    setEditingBubble(null)
+    setEditText("")
+    setEditTranslation("")
+  }
+
+  const handleCancelEdit = () => {
+    setEditingBubble(null)
+    setEditText("")
+    setEditTranslation("")
   }
 
   const redrawCanvas = () => {
@@ -297,7 +353,7 @@ export function CanvasOverlay({
 
   useEffect(() => {
     redrawCanvas()
-  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints])
+  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints, editingBubble])
 
   useEffect(() => {
     setIsDrawing(isAddingBubble)
@@ -336,9 +392,81 @@ export function CanvasOverlay({
           }
         }}
       />
+
+      {/* Inline Text Editing */}
+      {editingBubble && (
+        <div
+          className="absolute bg-white bg-opacity-95 border-2 border-green-500 rounded p-2 z-50"
+          style={{
+            left: editBounds.x,
+            top: editBounds.y,
+            width: Math.max(editBounds.width, 200),
+            minHeight: Math.max(editBounds.height, 100),
+          }}
+        >
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1">Original Text:</label>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="w-full p-1 border rounded text-xs resize-none"
+                rows={2}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && e.ctrlKey) {
+                    handleSaveEdit()
+                  }
+                  if (e.key === "Escape") {
+                    handleCancelEdit()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1">Translation:</label>
+              <textarea
+                value={editTranslation}
+                onChange={(e) => setEditTranslation(e.target.value)}
+                className="w-full p-1 border rounded text-xs resize-none"
+                rows={2}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && e.ctrlKey) {
+                    handleSaveEdit()
+                  }
+                  if (e.key === "Escape") {
+                    handleCancelEdit()
+                  }
+                }}
+              />
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={handleSaveEdit}
+                className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 flex-1"
+              >
+                Save (Ctrl+Enter)
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 flex-1"
+              >
+                Cancel (Esc)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isAddingBubble && (
         <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
           Click to add points. Double-click or right-click to finish polygon.
+        </div>
+      )}
+
+      {!isAddingBubble && !editingBubble && (
+        <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
+          Double-click speech bubble to edit text
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { Eye, EyeOff, RefreshCw, Plus, Trash2, Zap, MessageSquare, MapPin } from "lucide-react"
+import { Eye, EyeOff, RefreshCw, Plus, Trash2, Zap, MessageSquare, MapPin, Download, FileImage } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -19,6 +19,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 interface SpeechBubble {
   bubble_id: number
@@ -76,6 +80,7 @@ export function ComicEditorSidebar({
   const [fonts, setFonts] = useState<{ id: number; name: string }[]>([])
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null)
   const [isFontDialogOpen, setIsFontDialogOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [newBubbleData, setNewBubbleData] = useState({
     page_id: 0,
     bubble_no: 0,
@@ -258,6 +263,143 @@ export function ComicEditorSidebar({
       coordinates: [minX, minY, maxX, maxY],
       mask_coordinates: coordinates,
     }))
+  }
+
+  const captureCanvasElement = async (element: HTMLElement): Promise<string> => {
+    const canvas = await html2canvas(element, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2,
+      logging: false,
+    })
+    return canvas.toDataURL("image/png")
+  }
+
+  const exportToPDF = async () => {
+    if (!selectedFileId || pages.length === 0) {
+      toast({
+        title: "Error",
+        description: "No pages to export",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      const pdf = new jsPDF("p", "mm", "a4")
+      const sortedPages = pages.sort((a, b) => a.page_number - b.page_number)
+
+      for (let i = 0; i < sortedPages.length; i++) {
+        const page = sortedPages[i]
+
+        // Find the canvas overlay element for this page
+        const canvasElements = document.querySelectorAll(`[data-page-id="${page.page_id}"]`)
+        let canvasElement: HTMLElement | null = null
+
+        for (const element of canvasElements) {
+          const canvasOverlay = element.querySelector(".relative.inline-block")
+          if (canvasOverlay) {
+            canvasElement = canvasOverlay as HTMLElement
+            break
+          }
+        }
+
+        if (canvasElement) {
+          // Capture the canvas with overlays
+          const dataUrl = await captureCanvasElement(canvasElement)
+
+          if (i > 0) {
+            pdf.addPage()
+          }
+
+          // Calculate dimensions to fit the page
+          const imgWidth = 190 // A4 width minus margins
+          const imgHeight = 270 // A4 height minus margins
+
+          pdf.addImage(dataUrl, "PNG", 10, 10, imgWidth, imgHeight)
+
+          // Add page number
+          pdf.setFontSize(10)
+          pdf.text(`Page ${page.page_number}`, 10, 290)
+        }
+      }
+
+      pdf.save(`comic-file-${selectedFileId}-translated.pdf`)
+
+      toast({
+        title: "Success",
+        description: "PDF exported successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to export PDF: " + error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const exportToImages = async () => {
+    if (!selectedFileId || pages.length === 0) {
+      toast({
+        title: "Error",
+        description: "No pages to export",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      const zip = new JSZip()
+      const sortedPages = pages.sort((a, b) => a.page_number - b.page_number)
+
+      for (const page of sortedPages) {
+        // Find the canvas overlay element for this page
+        const canvasElements = document.querySelectorAll(`[data-page-id="${page.page_id}"]`)
+        let canvasElement: HTMLElement | null = null
+
+        for (const element of canvasElements) {
+          const canvasOverlay = element.querySelector(".relative.inline-block")
+          if (canvasOverlay) {
+            canvasElement = canvasOverlay as HTMLElement
+            break
+          }
+        }
+
+        if (canvasElement) {
+          // Capture the canvas with overlays
+          const dataUrl = await captureCanvasElement(canvasElement)
+
+          // Convert data URL to blob
+          const response = await fetch(dataUrl)
+          const blob = await response.blob()
+
+          // Add to zip
+          zip.file(`page-${page.page_number.toString().padStart(3, "0")}.png`, blob)
+        }
+      }
+
+      // Generate and download zip
+      const zipBlob = await zip.generateAsync({ type: "blob" })
+      saveAs(zipBlob, `comic-file-${selectedFileId}-translated-images.zip`)
+
+      toast({
+        title: "Success",
+        description: "Images exported successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to export images: " + error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -457,6 +599,43 @@ export function ComicEditorSidebar({
                   </DialogContent>
                 </Dialog>
               )}
+            </div>
+            <div className="border rounded p-3 space-y-3">
+              <Button
+                onClick={exportToPDF}
+                disabled={!selectedFileId || pages.length === 0 || isExporting}
+                className="w-full text-sm"
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={exportToImages}
+                disabled={!selectedFileId || pages.length === 0 || isExporting}
+                className="w-full text-sm bg-transparent"
+                variant="outline"
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <FileImage className="mr-2 h-4 w-4" />
+                    Export Images
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>

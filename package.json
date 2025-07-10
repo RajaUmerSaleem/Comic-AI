@@ -45,8 +45,10 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "latest",
     "fabric": "^5.5.2",
+    "file-saver": "^2.0.5",
     "input-otp": "latest",
     "jspdf": "^3.0.1",
+    "jszip": "^3.10.1",
     "konva": "^9.3.20",
     "lodash": "^4.17.21",
     "lucide-react": "^0.454.0",
@@ -70,6 +72,7 @@
   },
   "devDependencies": {
     "@types/fabric": "^5.3.10",
+    "@types/file-saver": "^2.0.7",
     "@types/lodash": "^4.17.20",
     "@types/node": "^22",
     "@types/react": "^19",
