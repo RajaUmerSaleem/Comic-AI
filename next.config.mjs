@@ -28,9 +28,24 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        canvas: false,
+        encoding: false,
+      };
+    }
+    return config;
+  },
+  
+  
   env: {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   },
+    transpilePackages: ['konva', 'react-konva'],
+
 }
+
 
 export default nextConfig
