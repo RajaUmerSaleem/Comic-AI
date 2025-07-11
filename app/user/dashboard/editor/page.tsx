@@ -43,6 +43,7 @@ interface SpeechBubble {
   translation: string | null
   font_size?: number | null
   font_color?: number[] | null
+  font_id?: number | null
 }
 
 interface EditorSection {
@@ -78,15 +79,18 @@ export default function EditorPage() {
   useEffect(() => {
     const observers: IntersectionObserver[] = []
     const visibilityMap = new Map<number, number>()
+
     const updateMostVisiblePage = () => {
       let maxRatio = 0
       let mostVisiblePageId: number | null = null
+
       for (const [pageId, ratio] of visibilityMap.entries()) {
         if (ratio > maxRatio) {
           maxRatio = ratio
           mostVisiblePageId = pageId
         }
       }
+
       if (mostVisiblePageId !== null) {
         setSelectedPageId(mostVisiblePageId)
       }
@@ -95,11 +99,13 @@ export default function EditorPage() {
     sections.forEach((section) => {
       const scrollEl = scrollRefs.current[section.id]
       if (!scrollEl) return
+
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             const pageIdAttr = entry.target.getAttribute("data-page-id")
             if (!pageIdAttr) return
+
             const pageId = Number(pageIdAttr)
             visibilityMap.set(pageId, entry.intersectionRatio)
             updateMostVisiblePage()
@@ -133,6 +139,7 @@ export default function EditorPage() {
         pollTaskStatus(taskId, key)
       })
     }, 3000)
+
     return () => clearInterval(interval)
   }, [processingTasks])
 
@@ -152,6 +159,7 @@ export default function EditorPage() {
   }
 
   const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
   const handleScrollSync = (source: HTMLDivElement) => {
     const scrollTop = source.scrollTop
     for (const [id, ref] of Object.entries(scrollRefs.current)) {
@@ -160,8 +168,6 @@ export default function EditorPage() {
       }
     }
   }
-
-  const lastClickedPageRef = useRef<number | null>(null)
 
   const fetchPages = async (fileId: number) => {
     try {
@@ -197,13 +203,17 @@ export default function EditorPage() {
 
   const startDetection = async (pageId?: number) => {
     if (!selectedFileId) return
+
     try {
       const url = pageId
         ? `/v1/file/async-detect?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-detect?file_id=${selectedFileId}`
+
       const response = await apiRequest(url, { method: "POST" }, token!)
+
       const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`
       addTask(taskKey, response.task_id)
+
       toast({
         title: "Detection Started",
         description: "Detecting speech bubbles...",
@@ -219,13 +229,17 @@ export default function EditorPage() {
 
   const startTextRemoval = async (pageId?: number) => {
     if (!selectedFileId) return
+
     try {
       const url = pageId
         ? `/v1/file/async-remove-text?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-remove-text?file_id=${selectedFileId}`
+
       const response = await apiRequest(url, { method: "POST" }, token!)
+
       const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`
       addTask(taskKey, response.task_id)
+
       toast({
         title: "Text Removal Started",
         description: "Removing text from speech bubbles...",
@@ -242,8 +256,10 @@ export default function EditorPage() {
   const pollTaskStatus = async (taskId: string, taskKey: string) => {
     try {
       const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token!)
+
       if (response.status === "SUCCESS" || response.status === "FAILED") {
         removeTask(taskKey)
+
         if (response.status === "SUCCESS") {
           toast({
             title: "Success",
@@ -334,6 +350,76 @@ export default function EditorPage() {
         variant: "destructive",
       })
     }
+  }
+
+  // New function to handle double-click bubble creation
+  const handleCanvasDoubleClick = async (coordinates: number[][]) => {
+    if (!selectedPageId) return
+
+    try {
+      // Calculate bounding box from polygon
+      let minX = Number.POSITIVE_INFINITY,
+        maxX = Number.NEGATIVE_INFINITY,
+        minY = Number.POSITIVE_INFINITY,
+        maxY = Number.NEGATIVE_INFINITY
+
+      for (const [x, y] of coordinates) {
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+
+      const newBubbleData = {
+        page_id: selectedPageId,
+        bubble_no: 0,
+        coordinates: [minX, minY, maxX, maxY],
+        mask_coordinates: coordinates,
+        text: "",
+        translation: "",
+      }
+
+      await apiRequest(
+        "/v1/pages/bubble",
+        {
+          method: "POST",
+          body: JSON.stringify(newBubbleData),
+        },
+        token!,
+      )
+
+      toast({
+        title: "Success",
+        description: "Speech bubble created successfully",
+      })
+
+      // Refresh pages
+      if (selectedFileId) {
+        fetchPages(selectedFileId)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Function to update pages state locally for real-time updates
+  const updatePageBubbleLocally = (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => {
+    setPages((prevPages) =>
+      prevPages.map((page) =>
+        page.page_id === pageId
+          ? {
+              ...page,
+              speech_bubbles: page.speech_bubbles.map((bubble) =>
+                bubble.bubble_id === bubbleId ? { ...bubble, ...updates } : bubble,
+              ),
+            }
+          : page,
+      ),
+    )
   }
 
   if (isLoading) {
@@ -437,6 +523,7 @@ export default function EditorPage() {
                               </div>
                             </div>
                           </div>
+
                           <div
                             className="flex-1 overflow-y-auto snap-y snap-mandatory px-4 py-2"
                             style={{ scrollBehavior: "auto" }}
@@ -469,6 +556,8 @@ export default function EditorPage() {
                                         isAddingBubble={isAddingBubble}
                                         onPolygonSelect={handlePolygonSelect}
                                         onBubbleTextUpdate={handleBubbleTextUpdate}
+                                        onCanvasDoubleClick={handleCanvasDoubleClick}
+                                        onBubbleUpdate={updatePageBubbleLocally}
                                       />
                                     ) : (
                                       <img
@@ -492,6 +581,7 @@ export default function EditorPage() {
               </CardContent>
             </Card>
           </div>
+
           <div className="lg:col-span-1">
             <div className="h-full border rounded-xl">
               <Tabs defaultValue="editor" className="w-full">
@@ -513,6 +603,7 @@ export default function EditorPage() {
                     onAddBubbleStart={handleAddBubbleStart}
                     onPolygonSelect={handlePolygonSelect}
                     isAddingBubble={isAddingBubble}
+                    onBubbleUpdate={updatePageBubbleLocally}
                   />
                 </TabsContent>
                 <TabsContent value="bubbles">
@@ -529,6 +620,7 @@ export default function EditorPage() {
                     onAddBubbleStart={handleAddBubbleStart}
                     onPolygonSelect={handlePolygonSelect}
                     isAddingBubble={isAddingBubble}
+                    onBubbleUpdate={updatePageBubbleLocally}
                   />
                 </TabsContent>
               </Tabs>

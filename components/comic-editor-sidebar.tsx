@@ -79,6 +79,7 @@ interface ComicEditorSidebarProps {
   onAddBubbleStart?: () => void
   onPolygonSelect?: (coordinates: number[][]) => void
   isAddingBubble?: boolean
+  onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
 }
 
 export function ComicEditorSidebar({
@@ -94,6 +95,7 @@ export function ComicEditorSidebar({
   onAddBubbleStart,
   onPolygonSelect,
   isAddingBubble = false,
+  onBubbleUpdate,
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
@@ -101,7 +103,7 @@ export function ComicEditorSidebar({
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null)
   const [isFontDialogOpen, setIsFontDialogOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [bubbleFonts, setBubbleFonts] = useState<Record<number, number>>({}) // bubble_id -> font_id
+  const [bubbleFonts, setBubbleFonts] = useState<Record<number, number>>({})
   const [newBubbleData, setNewBubbleData] = useState({
     page_id: 0,
     bubble_no: 0,
@@ -110,6 +112,7 @@ export function ComicEditorSidebar({
     text: "",
     translation: "",
   })
+
   const { toast } = useToast()
 
   const selectedPage = pages.find((p) => p.page_id === selectedPageId)
@@ -133,21 +136,35 @@ export function ComicEditorSidebar({
     fetchFonts()
   }, [])
 
-  // Initialize bubble fonts from page data
+  // Initialize bubble fonts from page data and set default selected font
   useEffect(() => {
     const newBubbleFonts: Record<number, number> = {}
+    let defaultFontId: number | null = null
+
     pages.forEach((page) => {
       page.speech_bubbles.forEach((bubble) => {
         if (bubble.font_id) {
           newBubbleFonts[bubble.bubble_id] = bubble.font_id
+          if (!defaultFontId) {
+            defaultFontId = bubble.font_id
+          }
         }
       })
     })
+
     setBubbleFonts(newBubbleFonts)
-  }, [pages])
+
+    // Set default font if not already set
+    if (!selectedFontId && defaultFontId) {
+      setSelectedFontId(defaultFontId)
+    } else if (!selectedFontId && fonts.length > 0) {
+      setSelectedFontId(fonts[0].id)
+    }
+  }, [pages, fonts])
 
   const createBubble = async () => {
     if (!selectedPageId) return
+
     try {
       await apiRequest(
         "/v1/pages/bubble",
@@ -157,10 +174,12 @@ export function ComicEditorSidebar({
         },
         token!,
       )
+
       toast({
         title: "Success",
         description: "Speech bubble created successfully",
       })
+
       setNewBubbleData({
         page_id: 0,
         bubble_no: 0,
@@ -169,6 +188,7 @@ export function ComicEditorSidebar({
         text: "",
         translation: "",
       })
+
       onPagesUpdate()
     } catch (error: any) {
       toast({
@@ -188,6 +208,7 @@ export function ComicEditorSidebar({
       })
       return
     }
+
     try {
       await apiRequest(`/v1/pages/bubble/${bubbleId}`, { method: "DELETE" }, token!)
       toast({ title: "Success", description: "Speech bubble deleted" })
@@ -229,8 +250,18 @@ export function ComicEditorSidebar({
         },
         token!,
       )
+
+      // Update local state for real-time preview
+      if (onBubbleUpdate) {
+        onBubbleUpdate(pageId, bubbleId, {
+          translation,
+          font_size: font_size || undefined,
+          font_color: font_color ? hexToRgbArray(font_color) : undefined,
+          font_id: font_id || bubbleFonts[bubbleId] || 1,
+        })
+      }
+
       toast({ title: "Success", description: "Translation updated" })
-      onPagesUpdate()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -245,6 +276,11 @@ export function ComicEditorSidebar({
     if (!bubble) return
 
     setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
+
+    // Update local state immediately for real-time preview
+    if (onBubbleUpdate) {
+      onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
+    }
 
     try {
       await apiRequest(
@@ -266,8 +302,8 @@ export function ComicEditorSidebar({
         },
         token!,
       )
+
       toast({ title: "Success", description: "Font updated" })
-      onPagesUpdate()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -285,6 +321,11 @@ export function ComicEditorSidebar({
   }
 
   const updateBubbleText = async (pageId: number, bubbleId: number, text: string) => {
+    // Update local state immediately for real-time preview
+    if (onBubbleUpdate) {
+      onBubbleUpdate(pageId, bubbleId, { text })
+    }
+
     try {
       await apiRequest(
         `/v1/pages/${pageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
@@ -293,8 +334,8 @@ export function ComicEditorSidebar({
         },
         token!,
       )
+
       toast({ title: "Success", description: "Text updated" })
-      onPagesUpdate()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -328,6 +369,7 @@ export function ComicEditorSidebar({
       maxX = Number.NEGATIVE_INFINITY,
       minY = Number.POSITIVE_INFINITY,
       maxY = Number.NEGATIVE_INFINITY
+
     for (const [x, y] of coordinates) {
       minX = Math.min(minX, x)
       maxX = Math.max(maxX, x)
@@ -369,7 +411,6 @@ export function ComicEditorSidebar({
 
       for (let i = 0; i < sortedPages.length; i++) {
         const page = sortedPages[i]
-
         // Find the canvas overlay element for this page
         const canvasElements = document.querySelectorAll(`[data-page-id="${page.page_id}"]`)
         let canvasElement: HTMLElement | null = null
@@ -403,7 +444,6 @@ export function ComicEditorSidebar({
       }
 
       pdf.save(`comic-file-${selectedFileId}-translated.pdf`)
-
       toast({
         title: "Success",
         description: "PDF exported successfully",
@@ -526,6 +566,7 @@ export function ComicEditorSidebar({
                 </Button>
               )}
             </div>
+
             <div className="border rounded p-3 space-y-3">
               <Button
                 onClick={() => onTextRemovalStart()}
@@ -547,6 +588,7 @@ export function ComicEditorSidebar({
                 </Button>
               )}
             </div>
+
             <div className="border rounded p-3 space-y-3">
               <Dialog open={isFontDialogOpen} onOpenChange={setIsFontDialogOpen}>
                 <DialogTrigger asChild>
@@ -613,6 +655,7 @@ export function ComicEditorSidebar({
                   </div>
                 </DialogContent>
               </Dialog>
+
               {selectedPageId && (
                 <Dialog open={isSinglePageTranslateDialogOpen} onOpenChange={setIsSinglePageTranslateDialogOpen}>
                   <DialogTrigger asChild>
@@ -682,6 +725,7 @@ export function ComicEditorSidebar({
                 </Dialog>
               )}
             </div>
+
             <div className="border rounded p-3 space-y-3">
               <Button
                 onClick={exportToPDF}
@@ -774,13 +818,30 @@ export function ComicEditorSidebar({
                         <p className="text-xs font-medium text-muted-foreground">Original Text:</p>
                         <Textarea
                           className="text-sm"
-                          defaultValue={bubble.text}
+                          value={bubble.text}
+                          onChange={(e) => {
+                            // Update local state immediately
+                            if (onBubbleUpdate) {
+                              onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
+                                text: e.target.value,
+                              })
+                            }
+                          }}
                           onBlur={(e) => updateBubbleText(selectedPage.page_id, bubble.bubble_id, e.target.value)}
                         />
+
                         <p className="text-xs font-medium text-muted-foreground">Translation:</p>
                         <Textarea
                           className="text-sm"
-                          defaultValue={bubble.translation || ""}
+                          value={bubble.translation || ""}
+                          onChange={(e) => {
+                            // Update local state immediately
+                            if (onBubbleUpdate) {
+                              onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
+                                translation: e.target.value,
+                              })
+                            }
+                          }}
                           onBlur={(e) =>
                             updateBubbleTranslation(selectedPage.page_id, bubble.bubble_id, e.target.value)
                           }
@@ -790,13 +851,19 @@ export function ComicEditorSidebar({
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
                             <Type className="h-3 w-3" />
-                            <Label className="text-xs">Font</Label>
+                            <Label className="text-xs">Choose Font</Label>
                           </div>
                           <Select
-                            value={bubbleFonts[bubble.bubble_id]?.toString() || bubble.font_id?.toString() || ""}
-                            onValueChange={(value) =>
-                              updateBubbleFont(selectedPage.page_id, bubble.bubble_id, Number(value))
+                            value={
+                              bubbleFonts[bubble.bubble_id]?.toString() ||
+                              bubble.font_id?.toString() ||
+                              selectedFontId?.toString() ||
+                              ""
                             }
+                            onValueChange={(value) => {
+                              const fontId = Number(value)
+                              updateBubbleFont(selectedPage.page_id, bubble.bubble_id, fontId)
+                            }}
                           >
                             <SelectTrigger className="text-xs">
                               <SelectValue placeholder="Select font">
@@ -804,7 +871,9 @@ export function ComicEditorSidebar({
                                   ? getFontName(bubbleFonts[bubble.bubble_id])
                                   : bubble.font_id
                                     ? getFontName(bubble.font_id)
-                                    : "Select font"}
+                                    : selectedFontId
+                                      ? getFontName(selectedFontId)
+                                      : "Select font"}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
@@ -828,7 +897,16 @@ export function ComicEditorSidebar({
                             <input
                               type="number"
                               className="border rounded px-2 py-1 text-sm"
-                              defaultValue={bubble.font_size || 12}
+                              value={bubble.font_size || 12}
+                              onChange={(e) => {
+                                const fontSize = Number(e.target.value)
+                                // Update local state immediately
+                                if (onBubbleUpdate) {
+                                  onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
+                                    font_size: fontSize,
+                                  })
+                                }
+                              }}
                               onBlur={(e) =>
                                 updateBubbleTranslation(
                                   selectedPage.page_id,
@@ -836,7 +914,7 @@ export function ComicEditorSidebar({
                                   bubble.translation || "",
                                   Number(e.target.value),
                                   bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
-          bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? 1
+                                  bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? selectedFontId ?? 1,
                                 )
                               }
                             />
@@ -846,9 +924,15 @@ export function ComicEditorSidebar({
                             <input
                               type="color"
                               className="h-9 rounded"
-                              defaultValue={
-                                Array.isArray(bubble.font_color) ? rgbArrayToHex(bubble.font_color) : "#000000"
-                              }
+                              value={Array.isArray(bubble.font_color) ? rgbArrayToHex(bubble.font_color) : "#000000"}
+                              onChange={(e) => {
+                                // Update local state immediately
+                                if (onBubbleUpdate) {
+                                  onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
+                                    font_color: hexToRgbArray(e.target.value),
+                                  })
+                                }
+                              }}
                               onBlur={(e) =>
                                 updateBubbleTranslation(
                                   selectedPage.page_id,
@@ -856,7 +940,7 @@ export function ComicEditorSidebar({
                                   bubble.translation || "",
                                   bubble.font_size || 12,
                                   e.target.value,
-          bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? 1
+                                  bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? selectedFontId ?? 1,
                                 )
                               }
                             />
@@ -866,6 +950,7 @@ export function ComicEditorSidebar({
                     </div>
                   ))
                 )}
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full bg-transparent">
@@ -878,7 +963,7 @@ export function ComicEditorSidebar({
                       <DialogTitle>Create Speech Bubble</DialogTitle>
                       <DialogDescription>
                         {isAddingBubble
-                          ? "Click on the canvas to draw a polygon for the speech bubble"
+                          ? "Go to the translated tab and click to draw a polygon for the speech bubble"
                           : "Add a new speech bubble to this page"}
                       </DialogDescription>
                     </DialogHeader>
@@ -930,7 +1015,12 @@ export function ComicEditorSidebar({
                             Go to the translated tab and click to create polygon points. Double-click or right-click to
                             finish.
                           </p>
-                          <Button onClick={() => {}} variant="outline">
+                          <Button
+                            onClick={() => {
+                              // setIsAddingBubble(false);
+                            }}
+                            variant="outline"
+                          >
                             Cancel
                           </Button>
                         </div>

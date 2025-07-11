@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useRef, useState } from "react"
 
 interface SpeechBubble {
@@ -13,6 +12,7 @@ interface SpeechBubble {
   translation: string | null
   font_size?: number | null
   font_color?: number[] | null
+  font_id?: number | null
 }
 
 interface CanvasOverlayProps {
@@ -24,6 +24,8 @@ interface CanvasOverlayProps {
   isAddingBubble?: boolean
   onPolygonSelect?: (coordinates: number[][]) => void
   onBubbleTextUpdate?: (bubbleId: number, text: string, translation: string) => void
+  onCanvasDoubleClick?: (coordinates: number[][]) => void
+  onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
 }
 
 export function CanvasOverlay({
@@ -35,6 +37,8 @@ export function CanvasOverlay({
   isAddingBubble = false,
   onPolygonSelect,
   onBubbleTextUpdate,
+  onCanvasDoubleClick,
+  onBubbleUpdate,
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -44,20 +48,20 @@ export function CanvasOverlay({
   const [editText, setEditText] = useState("")
   const [editTranslation, setEditTranslation] = useState("")
   const [editBounds, setEditBounds] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const [draggedBubble, setDraggedBubble] = useState<number | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
 
   const isPointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
     const [x, y] = point
     let inside = false
-
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       const [xi, yi] = polygon[i]
       const [xj, yj] = polygon[j]
-
       if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
         inside = !inside
       }
     }
-
     return inside
   }
 
@@ -68,20 +72,18 @@ export function CanvasOverlay({
 
     const isSelected = selectedBubbleId === bubble.bubble_id
     const isEditing = editingBubble === bubble.bubble_id
+    const isDraggedBubble = draggedBubble === bubble.bubble_id
 
     // Draw polygon outline
     ctx.beginPath()
-    ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : "#3b82f6"
-    ctx.lineWidth = isSelected ? 3 : isEditing ? 3 : 2
-
+    ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
+    ctx.lineWidth = isSelected ? 3 : isEditing ? 3 : isDraggedBubble ? 3 : 2
     const firstPoint = bubble.mask_coordinates[0]
     ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
-
     for (let i = 1; i < bubble.mask_coordinates.length; i++) {
       const point = bubble.mask_coordinates[i]
       ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
     }
-
     ctx.closePath()
     ctx.stroke()
 
@@ -90,7 +92,9 @@ export function CanvasOverlay({
       ? "rgba(239, 68, 68, 0.1)"
       : isEditing
         ? "rgba(16, 185, 129, 0.1)"
-        : "rgba(255, 255, 255, 0.9)"
+        : isDraggedBubble
+          ? "rgba(245, 158, 11, 0.1)"
+          : "rgba(255, 255, 255, 0.9)"
     ctx.fill()
 
     // Don't draw text if currently editing this bubble
@@ -106,6 +110,7 @@ export function CanvasOverlay({
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
         maxY = Number.NEGATIVE_INFINITY
+
       for (const point of bubble.mask_coordinates) {
         minX = Math.min(minX, point[0] * scaleX)
         maxX = Math.max(maxX, point[0] * scaleX)
@@ -131,7 +136,7 @@ export function CanvasOverlay({
         ctx.fillStyle = "#000000"
       }
 
-      // Word wrap text to fit in polygon bounds
+      // Word wrap text to fit in polygon bounds - REMOVED TRUNCATION
       const words = textToShow.split(/\s+/)
       const lines: string[] = []
       let currentLine = ""
@@ -139,7 +144,6 @@ export function CanvasOverlay({
       for (const word of words) {
         const testLine = currentLine + (currentLine ? " " : "") + word
         const metrics = ctx.measureText(testLine)
-
         if (metrics.width > maxWidth && currentLine) {
           lines.push(currentLine)
           currentLine = word
@@ -151,33 +155,19 @@ export function CanvasOverlay({
         lines.push(currentLine)
       }
 
-      // Constrain lines to fit within polygon height
+      // Draw all lines without truncation - allow overflow
       const lineHeight = fontSize * 1.2
-      const totalTextHeight = lines.length * lineHeight
-      const maxLines = Math.floor(maxHeight / lineHeight)
-
-      if (lines.length > maxLines) {
-        lines.splice(maxLines - 1)
-        if (lines.length > 0) {
-          lines[lines.length - 1] += "..."
-        }
-      }
-
-      // Draw each line, ensuring it stays within polygon bounds
       const startY = centerY - ((lines.length - 1) * lineHeight) / 2
 
       lines.forEach((line, index) => {
         const y = startY + index * lineHeight
-        // Check if text position is within polygon bounds
-        if (y >= minY && y <= maxY) {
-          ctx.fillText(line, centerX, y)
-        }
+        ctx.fillText(line, centerX, y)
       })
     }
 
     // Draw bubble number
     ctx.font = `${Math.max(10, 12 * Math.min(scaleX, scaleY))}px Arial`
-    ctx.fillStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : "#3b82f6"
+    ctx.fillStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
     ctx.strokeStyle = "white"
     ctx.lineWidth = 2
     const numberText = `#${bubble.bubble_no}`
@@ -187,7 +177,112 @@ export function CanvasOverlay({
     ctx.fillText(numberText, numberX, numberY)
   }
 
+  const handleCanvasMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    const image = imageRef.current
+    if (!canvas || !image) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+
+    // Convert to image coordinates
+    const scaleX = image.naturalWidth / canvas.width
+    const scaleY = image.naturalHeight / canvas.height
+    const imageX = x * scaleX
+    const imageY = y * scaleY
+
+    // Check if we're clicking on a bubble for dragging
+    for (const bubble of speechBubbles) {
+      if (bubble.mask_coordinates && bubble.mask_coordinates.length > 0) {
+        if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
+          setDraggedBubble(bubble.bubble_id)
+          setIsDragging(true)
+
+          // Calculate offset from bubble center
+          const centerX =
+            bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
+          const centerY =
+            bubble.mask_coordinates.reduce((sum, point) => sum + point[1], 0) / bubble.mask_coordinates.length
+
+          setDragOffset({
+            x: imageX - centerX,
+            y: imageY - centerY,
+          })
+          return
+        }
+      }
+    }
+  }
+
+  const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging || !draggedBubble) return
+
+    const canvas = canvasRef.current
+    const image = imageRef.current
+    if (!canvas || !image) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+
+    // Convert to image coordinates
+    const scaleX = image.naturalWidth / canvas.width
+    const scaleY = image.naturalHeight / canvas.height
+    const imageX = x * scaleX
+    const imageY = y * scaleY
+
+    // Find the bubble being dragged
+    const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
+    if (!bubble) return
+
+    // Calculate new center position
+    const newCenterX = imageX - dragOffset.x
+    const newCenterY = imageY - dragOffset.y
+
+    // Calculate current center
+    const currentCenterX =
+      bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
+    const currentCenterY =
+      bubble.mask_coordinates.reduce((sum, point) => sum + point[1], 0) / bubble.mask_coordinates.length
+
+    // Calculate offset to apply to all points
+    const offsetX = newCenterX - currentCenterX
+    const offsetY = newCenterY - currentCenterY
+
+    // Update bubble coordinates locally for real-time preview
+    const newMaskCoordinates = bubble.mask_coordinates.map((point) => [point[0] + offsetX, point[1] + offsetY])
+
+    const newBoundingBox = [
+      bubble.coordinates[0] + offsetX,
+      bubble.coordinates[1] + offsetY,
+      bubble.coordinates[2] + offsetX,
+      bubble.coordinates[3] + offsetY,
+    ]
+
+    // Update local state for real-time preview
+    if (onBubbleUpdate) {
+      onBubbleUpdate(pageId, draggedBubble, {
+        mask_coordinates: newMaskCoordinates,
+        coordinates: newBoundingBox,
+      })
+    }
+  }
+
+  const handleCanvasMouseUp = () => {
+    if (isDragging && draggedBubble) {
+      // Here you would typically save the new position to the server
+      // For now, we'll just update the local state
+      setIsDragging(false)
+      setDraggedBubble(null)
+      setDragOffset({ x: 0, y: 0 })
+    }
+  }
+
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    // Don't handle click if we were dragging
+    if (isDragging) return
+
     const canvas = canvasRef.current
     const image = imageRef.current
     if (!canvas || !image) return
@@ -206,15 +301,6 @@ export function CanvasOverlay({
       // Add point to polygon
       const newPoints = [...polygonPoints, [imageX, imageY]]
       setPolygonPoints(newPoints)
-
-      // If right click or double click, finish polygon
-      if (event.detail === 2 || event.button === 2) {
-        if (newPoints.length >= 3) {
-          onPolygonSelect?.(newPoints)
-          setPolygonPoints([])
-          setIsDrawing(false)
-        }
-      }
       return
     }
 
@@ -229,6 +315,7 @@ export function CanvasOverlay({
               maxX = Number.NEGATIVE_INFINITY,
               minY = Number.POSITIVE_INFINITY,
               maxY = Number.NEGATIVE_INFINITY
+
             for (const point of bubble.mask_coordinates) {
               minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
               maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
@@ -252,6 +339,28 @@ export function CanvasOverlay({
         }
       }
     }
+
+    // Double click on empty area to create new bubble
+    if (event.detail === 2 && !isAddingBubble) {
+      // Create a small default polygon around the click point
+      const size = 50 // Default bubble size
+      const defaultPolygon = [
+        [imageX - size, imageY - size],
+        [imageX + size, imageY - size],
+        [imageX + size, imageY + size],
+        [imageX - size, imageY + size],
+      ]
+      onCanvasDoubleClick?.(defaultPolygon)
+    }
+  }
+
+  const handleRightClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault()
+    if (isAddingBubble && polygonPoints.length >= 3) {
+      onPolygonSelect?.(polygonPoints)
+      setPolygonPoints([])
+      setIsDrawing(false)
+    }
   }
 
   const handleSaveEdit = () => {
@@ -272,7 +381,6 @@ export function CanvasOverlay({
   const redrawCanvas = () => {
     const canvas = canvasRef.current
     const image = imageRef.current
-
     if (!canvas || !image) return
 
     const ctx = canvas.getContext("2d")
@@ -296,18 +404,15 @@ export function CanvasOverlay({
       ctx.strokeStyle = "#10b981"
       ctx.lineWidth = 2
       ctx.setLineDash([5, 5])
-
       const firstPoint = polygonPoints[0]
       ctx.moveTo(
         (firstPoint[0] / image.naturalWidth) * canvas.width,
         (firstPoint[1] / image.naturalHeight) * canvas.height,
       )
-
       for (let i = 1; i < polygonPoints.length; i++) {
         const point = polygonPoints[i]
         ctx.lineTo((point[0] / image.naturalWidth) * canvas.width, (point[1] / image.naturalHeight) * canvas.height)
       }
-
       ctx.stroke()
       ctx.setLineDash([])
 
@@ -339,7 +444,6 @@ export function CanvasOverlay({
       const rect = image.getBoundingClientRect()
       canvas.width = rect.width
       canvas.height = rect.height
-
       redrawCanvas()
     }
 
@@ -353,7 +457,7 @@ export function CanvasOverlay({
 
   useEffect(() => {
     redrawCanvas()
-  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints, editingBubble])
+  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints, editingBubble, draggedBubble])
 
   useEffect(() => {
     setIsDrawing(isAddingBubble)
@@ -380,17 +484,13 @@ export function CanvasOverlay({
         className="absolute top-0 left-0 w-full h-full cursor-pointer"
         style={{
           borderRadius: "0.375rem",
-          cursor: isAddingBubble ? "crosshair" : "pointer",
+          cursor: isAddingBubble ? "crosshair" : isDragging ? "grabbing" : "pointer",
         }}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
         onClick={handleCanvasClick}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          if (isAddingBubble && polygonPoints.length >= 3) {
-            onPolygonSelect?.(polygonPoints)
-            setPolygonPoints([])
-            setIsDrawing(false)
-          }
-        }}
+        onContextMenu={handleRightClick}
       />
 
       {/* Inline Text Editing */}
@@ -460,13 +560,13 @@ export function CanvasOverlay({
 
       {isAddingBubble && (
         <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
-          Click to add points. Double-click or right-click to finish polygon.
+          Click to add points. Right-click to finish polygon.
         </div>
       )}
 
       {!isAddingBubble && !editingBubble && (
         <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
-          Double-click speech bubble to edit text
+          Double-click speech bubble to edit text • Double-click empty area to add bubble • Drag bubbles to move
         </div>
       )}
     </div>
