@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,8 +9,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/api"
-import { Eye, EyeOff, RefreshCw, Plus, Trash2, Zap, MessageSquare, MapPin, Download, FileImage } from "lucide-react"
+import {
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Plus,
+  Trash2,
+  Zap,
+  MessageSquare,
+  MapPin,
+  Download,
+  FileImage,
+  Type,
+} from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -33,6 +46,7 @@ interface SpeechBubble {
   translation: string | null
   font_size?: number | null
   font_color?: number[] | null
+  font_id?: number | null
 }
 
 interface PageData {
@@ -44,6 +58,12 @@ interface PageData {
   text_translated_image_url: string | null
   status: string
   speech_bubbles: SpeechBubble[]
+}
+
+interface Font {
+  id: number
+  name: string
+  file_url?: string
 }
 
 interface ComicEditorSidebarProps {
@@ -77,10 +97,11 @@ export function ComicEditorSidebar({
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
-  const [fonts, setFonts] = useState<{ id: number; name: string }[]>([])
+  const [fonts, setFonts] = useState<Font[]>([])
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null)
   const [isFontDialogOpen, setIsFontDialogOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [bubbleFonts, setBubbleFonts] = useState<Record<number, number>>({}) // bubble_id -> font_id
   const [newBubbleData, setNewBubbleData] = useState({
     page_id: 0,
     bubble_no: 0,
@@ -106,6 +127,24 @@ export function ComicEditorSidebar({
       })
     }
   }
+
+  // Fetch fonts on component mount
+  useEffect(() => {
+    fetchFonts()
+  }, [])
+
+  // Initialize bubble fonts from page data
+  useEffect(() => {
+    const newBubbleFonts: Record<number, number> = {}
+    pages.forEach((page) => {
+      page.speech_bubbles.forEach((bubble) => {
+        if (bubble.font_id) {
+          newBubbleFonts[bubble.bubble_id] = bubble.font_id
+        }
+      })
+    })
+    setBubbleFonts(newBubbleFonts)
+  }, [pages])
 
   const createBubble = async () => {
     if (!selectedPageId) return
@@ -168,6 +207,7 @@ export function ComicEditorSidebar({
     translation: string,
     font_size?: number,
     font_color?: string,
+    font_id?: number,
   ) => {
     try {
       await apiRequest(
@@ -176,7 +216,7 @@ export function ComicEditorSidebar({
           method: "PUT",
           body: JSON.stringify({
             page_id: pageId,
-            font_id: 1,
+            font_id: font_id || bubbleFonts[bubbleId] || 1,
             bubble_data: [
               {
                 bubble_id: bubbleId,
@@ -190,6 +230,43 @@ export function ComicEditorSidebar({
         token!,
       )
       toast({ title: "Success", description: "Translation updated" })
+      onPagesUpdate()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number) => {
+    const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
+    if (!bubble) return
+
+    setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
+
+    try {
+      await apiRequest(
+        `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            page_id: pageId,
+            font_id: fontId,
+            bubble_data: [
+              {
+                bubble_id: bubbleId,
+                translation: bubble.translation || "",
+                font_size: bubble.font_size || 12,
+                font_color: bubble.font_color || [0, 0, 0],
+              },
+            ],
+          }),
+        },
+        token!,
+      )
+      toast({ title: "Success", description: "Font updated" })
       onPagesUpdate()
     } catch (error: any) {
       toast({
@@ -402,6 +479,11 @@ export function ComicEditorSidebar({
     }
   }
 
+  const getFontName = (fontId: number) => {
+    const font = fonts.find((f) => f.id === fontId)
+    return font ? font.name : "Default Font"
+  }
+
   return (
     <div className="space-y-4">
       {mode === "editor" && (
@@ -486,21 +568,21 @@ export function ComicEditorSidebar({
                   </DialogHeader>
                   <div className="space-y-4">
                     <Label htmlFor="font-select">Choose Font</Label>
-                    <select
-                      id="font-select"
-                      className="w-full border p-2 rounded"
-                      value={selectedFontId ?? ""}
-                      onChange={(e) => setSelectedFontId(Number(e.target.value))}
+                    <Select
+                      value={selectedFontId?.toString() || ""}
+                      onValueChange={(value) => setSelectedFontId(Number(value))}
                     >
-                      <option value="" disabled>
-                        Select a font
-                      </option>
-                      {fonts.map((font) => (
-                        <option key={font.id} value={font.id}>
-                          {font.name}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a font" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fonts.map((font) => (
+                          <SelectItem key={font.id} value={font.id.toString()}>
+                            {font.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       onClick={async () => {
                         if (!selectedFileId || !selectedFontId) return
@@ -553,21 +635,21 @@ export function ComicEditorSidebar({
                     </DialogHeader>
                     <div className="space-y-4">
                       <Label htmlFor="font-select-single">Choose Font</Label>
-                      <select
-                        id="font-select-single"
-                        className="w-full border p-2 rounded"
-                        value={selectedFontId ?? ""}
-                        onChange={(e) => setSelectedFontId(Number(e.target.value))}
+                      <Select
+                        value={selectedFontId?.toString() || ""}
+                        onValueChange={(value) => setSelectedFontId(Number(value))}
                       >
-                        <option value="" disabled>
-                          Select a font
-                        </option>
-                        {fonts.map((font) => (
-                          <option key={font.id} value={font.id}>
-                            {font.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a font" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fonts.map((font) => (
+                            <SelectItem key={font.id} value={font.id.toString()}>
+                              {font.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         onClick={async () => {
                           if (!selectedFileId || !selectedPageId || !selectedFontId) return
@@ -703,6 +785,43 @@ export function ComicEditorSidebar({
                             updateBubbleTranslation(selectedPage.page_id, bubble.bubble_id, e.target.value)
                           }
                         />
+
+                        {/* Font Selection */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1">
+                            <Type className="h-3 w-3" />
+                            <Label className="text-xs">Font</Label>
+                          </div>
+                          <Select
+                            value={bubbleFonts[bubble.bubble_id]?.toString() || bubble.font_id?.toString() || ""}
+                            onValueChange={(value) =>
+                              updateBubbleFont(selectedPage.page_id, bubble.bubble_id, Number(value))
+                            }
+                          >
+                            <SelectTrigger className="text-xs">
+                              <SelectValue placeholder="Select font">
+                                {bubbleFonts[bubble.bubble_id]
+                                  ? getFontName(bubbleFonts[bubble.bubble_id])
+                                  : bubble.font_id
+                                    ? getFontName(bubble.font_id)
+                                    : "Select font"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fonts.map((font) => (
+                                <SelectItem key={font.id} value={font.id.toString()}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{font.name}</span>
+                                    {font.file_url && (
+                                      <span className="text-xs text-muted-foreground">Custom Font</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
                         <div className="flex items-center gap-4">
                           <div className="flex flex-col w-1/2">
                             <Label className="text-xs">Font Size</Label>
@@ -717,6 +836,7 @@ export function ComicEditorSidebar({
                                   bubble.translation || "",
                                   Number(e.target.value),
                                   bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
+          bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? 1
                                 )
                               }
                             />
@@ -736,6 +856,7 @@ export function ComicEditorSidebar({
                                   bubble.translation || "",
                                   bubble.font_size || 12,
                                   e.target.value,
+          bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? 1
                                 )
                               }
                             />
