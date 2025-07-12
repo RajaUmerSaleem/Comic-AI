@@ -874,7 +874,7 @@ export function ComicEditorSidebar({
       {mode === "bubbles" && selectedPage && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex h-full items-center">
               <MessageSquare className="mr-2 h-4 w-4" />
               Speech Bubbles
             </CardTitle>
@@ -883,7 +883,8 @@ export function ComicEditorSidebar({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-96">
+            <ScrollArea className="h-screen">
+
               <div className="space-y-3">
                 {selectedPage.speech_bubbles.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">

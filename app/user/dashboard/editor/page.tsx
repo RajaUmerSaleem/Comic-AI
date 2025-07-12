@@ -604,7 +604,7 @@ export default function EditorPage() {
                   <TabsTrigger value="editor">Editor</TabsTrigger>
                   <TabsTrigger value="bubbles">Speech Bubbles</TabsTrigger>
                 </TabsList>
-                <TabsContent value="editor" className="border-none">
+                <TabsContent value="editor">
                   <ComicEditorSidebar
                     selectedFileId={selectedFileId}
                     selectedPageId={selectedPageId}
