@@ -316,17 +316,18 @@ export default function EditorPage() {
   };
 
   const getImageUrl = (page: PageData, state: string) => {
-    switch (state) {
-      case "detected":
-        return page.detected_image_url;
-      case "text_removed":
-        return page.text_removed_image_url;
-      case "text_translated":
-        return page.text_removed_image_url;
-      default:
-        return page.page_image_url;
-    }
-  };
+  switch (state) {
+    case "detected":
+      return page.detected_image_url
+    case "text_removed":
+      return page.text_removed_image_url
+    case "text_translated":
+      return page.text_removed_image_url
+    default:
+      return page.page_image_url
+  }
+}
+
 
   const handleBubbleClick = (bubble: SpeechBubble) => {
     setSelectedBubbleId(bubble.bubble_id);
