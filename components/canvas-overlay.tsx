@@ -149,8 +149,8 @@ export function CanvasOverlay({
       return
     }
 
-    // Draw translation text if available
-    const textToShow = bubble.translation || bubble.text
+    // Draw ONLY translation text (not original text)
+    const textToShow = bubble.translation || ""
     if (textToShow && textToShow.trim()) {
       const centerX = (minX + maxX) / 2
       const centerY = (minY + maxY) / 2
