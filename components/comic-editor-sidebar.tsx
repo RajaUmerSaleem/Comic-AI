@@ -33,7 +33,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
 
@@ -275,11 +274,18 @@ export function ComicEditorSidebar({
     const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
     if (!bubble) return
 
+    // Update local font mapping immediately
     setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
 
     // Update local state immediately for real-time preview
     if (onBubbleUpdate) {
-      onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
+      onBubbleUpdate(pageId, bubbleId, {
+        font_id: fontId,
+        // Force a re-render by updating other properties too
+        translation: bubble.translation || "",
+        font_size: bubble.font_size || 12,
+        font_color: bubble.font_color || [0, 0, 0],
+      })
     }
 
     try {
@@ -384,14 +390,39 @@ export function ComicEditorSidebar({
     }))
   }
 
-  const captureCanvasElement = async (element: HTMLElement): Promise<string> => {
-    const canvas = await html2canvas(element, {
-      useCORS: true,
-      allowTaint: true,
-      scale: 2,
-      logging: false,
-    })
-    return canvas.toDataURL("image/png")
+  const captureCanvasElementClean = async (element: HTMLElement): Promise<string> => {
+    // Find the canvas element within the container
+    const canvasElement = element.querySelector("canvas") as HTMLCanvasElement
+    const imageElement = element.querySelector("img") as HTMLImageElement
+
+    if (!canvasElement || !imageElement) {
+      throw new Error("Canvas or image element not found")
+    }
+
+    // Get the export canvas without UI elements
+    const exportCanvas = (canvasElement as any).getExportCanvas?.()
+    if (!exportCanvas) {
+      throw new Error("Export canvas not available")
+    }
+
+    // Create a composite canvas with the image and clean bubbles
+    const compositeCanvas = document.createElement("canvas")
+    const ctx = compositeCanvas.getContext("2d")
+    if (!ctx) {
+      throw new Error("Could not get canvas context")
+    }
+
+    // Set canvas size to match the export canvas
+    compositeCanvas.width = exportCanvas.width
+    compositeCanvas.height = exportCanvas.height
+
+    // Draw the original image first
+    ctx.drawImage(imageElement, 0, 0, compositeCanvas.width, compositeCanvas.height)
+
+    // Draw the clean bubbles on top
+    ctx.drawImage(exportCanvas, 0, 0)
+
+    return compositeCanvas.toDataURL("image/png")
   }
 
   const exportToPDF = async () => {
@@ -424,8 +455,8 @@ export function ComicEditorSidebar({
         }
 
         if (canvasElement) {
-          // Capture the canvas with overlays
-          const dataUrl = await captureCanvasElement(canvasElement)
+          // Capture the canvas with clean bubbles (no borders)
+          const dataUrl = await captureCanvasElementClean(canvasElement)
 
           if (i > 0) {
             pdf.addPage()
@@ -488,8 +519,8 @@ export function ComicEditorSidebar({
         }
 
         if (canvasElement) {
-          // Capture the canvas with overlays
-          const dataUrl = await captureCanvasElement(canvasElement)
+          // Capture the canvas with clean bubbles (no borders)
+          const dataUrl = await captureCanvasElementClean(canvasElement)
 
           // Convert data URL to blob
           const response = await fetch(dataUrl)
@@ -522,6 +553,56 @@ export function ComicEditorSidebar({
   const getFontName = (fontId: number) => {
     const font = fonts.find((f) => f.id === fontId)
     return font ? font.name : "Default Font"
+  }
+
+  const exportCurrentImage = async () => {
+    if (!selectedFileId || !selectedPageId || !selectedPage) {
+      toast({
+        title: "Error",
+        description: "No current page to export",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      // Find the canvas overlay element for the current page
+      const canvasElements = document.querySelectorAll(`[data-page-id="${selectedPageId}"]`)
+      let canvasElement: HTMLElement | null = null
+
+      for (const element of canvasElements) {
+        const canvasOverlay = element.querySelector(".relative.inline-block")
+        if (canvasOverlay) {
+          canvasElement = canvasOverlay as HTMLElement
+          break
+        }
+      }
+
+      if (canvasElement) {
+        // Capture the canvas with clean bubbles (no borders)
+        const dataUrl = await captureCanvasElementClean(canvasElement)
+
+        // Create download link
+        const link = document.createElement("a")
+        link.download = `comic-page-${selectedPage.page_number}.png`
+        link.href = dataUrl
+        link.click()
+
+        toast({
+          title: "Success",
+          description: "Current page exported successfully",
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to export current page: " + error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -763,6 +844,26 @@ export function ComicEditorSidebar({
                 )}
               </Button>
             </div>
+            <div className="border rounded p-3 space-y-3">
+              <Button
+                onClick={exportCurrentImage}
+                disabled={!selectedFileId || !selectedPageId || isExporting}
+                className="w-full text-sm bg-transparent"
+                variant="outline"
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <FileImage className="mr-2 h-4 w-4" />
+                    Export Current Image ({selectedPage?.page_number})
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -862,6 +963,11 @@ export function ComicEditorSidebar({
                             }
                             onValueChange={(value) => {
                               const fontId = Number(value)
+                              // Update local state immediately for real-time preview
+                              if (onBubbleUpdate) {
+                                onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, { font_id: fontId })
+                              }
+                              // Update the bubble font
                               updateBubbleFont(selectedPage.page_id, bubble.bubble_id, fontId)
                             }}
                           >
@@ -924,7 +1030,7 @@ export function ComicEditorSidebar({
                             <input
                               type="color"
                               className="h-9 rounded"
-                              value={Array.isArray(bubble.font_color) ? rgbArrayToHex(bubble.font_color) : "#000000"}
+                              value={bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000"}
                               onChange={(e) => {
                                 // Update local state immediately
                                 if (onBubbleUpdate) {

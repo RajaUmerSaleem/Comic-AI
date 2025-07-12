@@ -26,6 +26,7 @@ interface CanvasOverlayProps {
   onBubbleTextUpdate?: (bubbleId: number, text: string, translation: string) => void
   onCanvasDoubleClick?: (coordinates: number[][]) => void
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
+  isExporting?: boolean
 }
 
 export function CanvasOverlay({
@@ -39,6 +40,7 @@ export function CanvasOverlay({
   onBubbleTextUpdate,
   onCanvasDoubleClick,
   onBubbleUpdate,
+  isExporting = false,
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -65,7 +67,13 @@ export function CanvasOverlay({
     return inside
   }
 
-  const drawPolygonWithText = (ctx: CanvasRenderingContext2D, bubble: SpeechBubble, scaleX: number, scaleY: number) => {
+  const drawPolygonWithText = (
+    ctx: CanvasRenderingContext2D,
+    bubble: SpeechBubble,
+    scaleX: number,
+    scaleY: number,
+    hideUI = false,
+  ) => {
     if (!bubble.mask_coordinates || bubble.mask_coordinates.length === 0) {
       return
     }
@@ -74,58 +82,90 @@ export function CanvasOverlay({
     const isEditing = editingBubble === bubble.bubble_id
     const isDraggedBubble = draggedBubble === bubble.bubble_id
 
-    // Draw polygon outline
-    ctx.beginPath()
-    ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
-    ctx.lineWidth = isSelected ? 3 : isEditing ? 3 : isDraggedBubble ? 3 : 2
-    const firstPoint = bubble.mask_coordinates[0]
-    ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
-    for (let i = 1; i < bubble.mask_coordinates.length; i++) {
-      const point = bubble.mask_coordinates[i]
-      ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
-    }
-    ctx.closePath()
-    ctx.stroke()
+    // Calculate polygon bounds for bounding box
+    let minX = Number.POSITIVE_INFINITY,
+      maxX = Number.NEGATIVE_INFINITY,
+      minY = Number.POSITIVE_INFINITY,
+      maxY = Number.NEGATIVE_INFINITY
 
-    // Fill polygon with semi-transparent background
-    ctx.fillStyle = isSelected
-      ? "rgba(239, 68, 68, 0.1)"
-      : isEditing
-        ? "rgba(16, 185, 129, 0.1)"
-        : isDraggedBubble
-          ? "rgba(245, 158, 11, 0.1)"
-          : "rgba(255, 255, 255, 0.9)"
-    ctx.fill()
+    for (const point of bubble.mask_coordinates) {
+      minX = Math.min(minX, point[0] * scaleX)
+      maxX = Math.max(maxX, point[0] * scaleX)
+      minY = Math.min(minY, point[1] * scaleY)
+      maxY = Math.max(maxY, point[1] * scaleY)
+    }
+
+    // Only draw UI elements (borders, bounding boxes) if not exporting
+    if (!hideUI) {
+      // Draw bounding box around every bubble
+      ctx.beginPath()
+      ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#94a3b8"
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 3])
+      ctx.rect(minX, minY, maxX - minX, maxY - minY)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Draw polygon outline
+      ctx.beginPath()
+      ctx.strokeStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
+      ctx.lineWidth = isSelected ? 3 : isEditing ? 3 : isDraggedBubble ? 3 : 2
+      const firstPoint = bubble.mask_coordinates[0]
+      ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
+      for (let i = 1; i < bubble.mask_coordinates.length; i++) {
+        const point = bubble.mask_coordinates[i]
+        ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
+      }
+      ctx.closePath()
+      ctx.stroke()
+
+      // Fill polygon with semi-transparent background
+      ctx.fillStyle = isSelected
+        ? "rgba(239, 68, 68, 0.1)"
+        : isEditing
+          ? "rgba(16, 185, 129, 0.1)"
+          : isDraggedBubble
+            ? "rgba(245, 158, 11, 0.1)"
+            : "rgba(255, 255, 255, 0.9)"
+      ctx.fill()
+    } else {
+      // For export: Fill polygon with white background (no transparency)
+      ctx.beginPath()
+      const firstPoint = bubble.mask_coordinates[0]
+      ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
+      for (let i = 1; i < bubble.mask_coordinates.length; i++) {
+        const point = bubble.mask_coordinates[i]
+        ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
+      }
+      ctx.closePath()
+      ctx.fillStyle = "rgba(255, 255, 255, 1)" // Solid white background for export
+      ctx.fill()
+    }
 
     // Don't draw text if currently editing this bubble
-    if (isEditing) {
+    if (isEditing && !hideUI) {
       return
     }
 
     // Draw translation text if available
     const textToShow = bubble.translation || bubble.text
     if (textToShow && textToShow.trim()) {
-      // Calculate polygon bounds for text positioning
-      let minX = Number.POSITIVE_INFINITY,
-        maxX = Number.NEGATIVE_INFINITY,
-        minY = Number.POSITIVE_INFINITY,
-        maxY = Number.NEGATIVE_INFINITY
-
-      for (const point of bubble.mask_coordinates) {
-        minX = Math.min(minX, point[0] * scaleX)
-        maxX = Math.max(maxX, point[0] * scaleX)
-        minY = Math.min(minY, point[1] * scaleY)
-        maxY = Math.max(maxY, point[1] * scaleY)
-      }
-
       const centerX = (minX + maxX) / 2
       const centerY = (minY + maxY) / 2
       const maxWidth = (maxX - minX) * 0.8
       const maxHeight = (maxY - minY) * 0.8
 
-      // Set font properties
+      // Set font properties - APPLY FONT CHANGES IMMEDIATELY
       const fontSize = Math.max(12, Math.min((bubble.font_size || 14) * Math.min(scaleX, scaleY), maxHeight / 4))
-      ctx.font = `${fontSize}px Arial`
+
+      // Apply font family if font_id is available
+      let fontFamily = "Arial"
+      if (bubble.font_id) {
+        // You might want to map font IDs to actual font names here
+        fontFamily = "Arial" // Default for now, but this should be dynamic based on font_id
+      }
+
+      ctx.font = `${fontSize}px ${fontFamily}`
       ctx.textAlign = "center"
       ctx.textBaseline = "middle"
 
@@ -165,16 +205,18 @@ export function CanvasOverlay({
       })
     }
 
-    // Draw bubble number
-    ctx.font = `${Math.max(10, 12 * Math.min(scaleX, scaleY))}px Arial`
-    ctx.fillStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
-    ctx.strokeStyle = "white"
-    ctx.lineWidth = 2
-    const numberText = `#${bubble.bubble_no}`
-    const numberX = bubble.coordinates[0] * scaleX
-    const numberY = bubble.coordinates[1] * scaleY - 5
-    ctx.strokeText(numberText, numberX, numberY)
-    ctx.fillText(numberText, numberX, numberY)
+    // Only draw bubble number if not exporting
+    if (!hideUI) {
+      ctx.font = `${Math.max(10, 12 * Math.min(scaleX, scaleY))}px Arial`
+      ctx.fillStyle = isSelected ? "#ef4444" : isEditing ? "#10b981" : isDraggedBubble ? "#f59e0b" : "#3b82f6"
+      ctx.strokeStyle = "white"
+      ctx.lineWidth = 2
+      const numberText = `#${bubble.bubble_no}`
+      const numberX = bubble.coordinates[0] * scaleX
+      const numberY = bubble.coordinates[1] * scaleY - 5
+      ctx.strokeText(numberText, numberX, numberY)
+      ctx.fillText(numberText, numberX, numberY)
+    }
   }
 
   const handleCanvasMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -378,7 +420,7 @@ export function CanvasOverlay({
     setEditTranslation("")
   }
 
-  const redrawCanvas = () => {
+  const redrawCanvas = (hideUI = false) => {
     const canvas = canvasRef.current
     const image = imageRef.current
     if (!canvas || !image) return
@@ -395,41 +437,73 @@ export function CanvasOverlay({
 
     // Draw all speech bubbles
     speechBubbles.forEach((bubble) => {
-      drawPolygonWithText(ctx, bubble, scaleX, scaleY)
+      drawPolygonWithText(ctx, bubble, scaleX, scaleY, hideUI)
     })
 
-    // Draw current polygon being created
-    if (isAddingBubble && polygonPoints.length > 0) {
-      ctx.beginPath()
-      ctx.strokeStyle = "#10b981"
-      ctx.lineWidth = 2
-      ctx.setLineDash([5, 5])
-      const firstPoint = polygonPoints[0]
-      ctx.moveTo(
-        (firstPoint[0] / image.naturalWidth) * canvas.width,
-        (firstPoint[1] / image.naturalHeight) * canvas.height,
-      )
-      for (let i = 1; i < polygonPoints.length; i++) {
-        const point = polygonPoints[i]
-        ctx.lineTo((point[0] / image.naturalWidth) * canvas.width, (point[1] / image.naturalHeight) * canvas.height)
-      }
-      ctx.stroke()
-      ctx.setLineDash([])
-
-      // Draw points
-      polygonPoints.forEach((point, index) => {
+    // Only draw UI elements if not hiding UI
+    if (!hideUI) {
+      // Draw current polygon being created
+      if (isAddingBubble && polygonPoints.length > 0) {
         ctx.beginPath()
-        ctx.arc(
-          (point[0] / image.naturalWidth) * canvas.width,
-          (point[1] / image.naturalHeight) * canvas.height,
-          4,
-          0,
-          2 * Math.PI,
+        ctx.strokeStyle = "#10b981"
+        ctx.lineWidth = 2
+        ctx.setLineDash([5, 5])
+        const firstPoint = polygonPoints[0]
+        ctx.moveTo(
+          (firstPoint[0] / image.naturalWidth) * canvas.width,
+          (firstPoint[1] / image.naturalHeight) * canvas.height,
         )
-        ctx.fillStyle = index === 0 ? "#ef4444" : "#10b981"
-        ctx.fill()
-      })
+        for (let i = 1; i < polygonPoints.length; i++) {
+          const point = polygonPoints[i]
+          ctx.lineTo((point[0] / image.naturalWidth) * canvas.width, (point[1] / image.naturalHeight) * canvas.height)
+        }
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // Draw points
+        polygonPoints.forEach((point, index) => {
+          ctx.beginPath()
+          ctx.arc(
+            (point[0] / image.naturalWidth) * canvas.width,
+            (point[1] / image.naturalHeight) * canvas.height,
+            4,
+            0,
+            2 * Math.PI,
+          )
+          ctx.fillStyle = index === 0 ? "#ef4444" : "#10b981"
+          ctx.fill()
+        })
+      }
     }
+  }
+
+  // Function to get canvas for export (without UI elements)
+  const getExportCanvas = (): HTMLCanvasElement | null => {
+    const canvas = canvasRef.current
+    const image = imageRef.current
+    if (!canvas || !image) return null
+
+    // Create a new canvas for export
+    const exportCanvas = document.createElement("canvas")
+    exportCanvas.width = canvas.width
+    exportCanvas.height = canvas.height
+
+    const ctx = exportCanvas.getContext("2d")
+    if (!ctx) return null
+
+    // Clear canvas
+    ctx.clearRect(0, 0, exportCanvas.width, exportCanvas.height)
+
+    // Calculate scale factors
+    const scaleX = exportCanvas.width / image.naturalWidth
+    const scaleY = exportCanvas.height / image.naturalHeight
+
+    // Draw all speech bubbles WITHOUT UI elements
+    speechBubbles.forEach((bubble) => {
+      drawPolygonWithText(ctx, bubble, scaleX, scaleY, true) // hideUI = true
+    })
+
+    return exportCanvas
   }
 
   useEffect(() => {
@@ -465,6 +539,13 @@ export function CanvasOverlay({
       setPolygonPoints([])
     }
   }, [isAddingBubble])
+
+  // Expose the export canvas function to parent components
+  useEffect(() => {
+    if (canvasRef.current) {
+      ;(canvasRef.current as any).getExportCanvas = getExportCanvas
+    }
+  }, [speechBubbles])
 
   return (
     <div className="relative inline-block">
@@ -559,13 +640,13 @@ export function CanvasOverlay({
       )}
 
       {isAddingBubble && (
-        <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
+        <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm instruction-overlay">
           Click to add points. Right-click to finish polygon.
         </div>
       )}
 
       {!isAddingBubble && !editingBubble && (
-        <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
+        <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm instruction-overlay">
           Double-click speech bubble to edit text • Double-click empty area to add bubble • Drag bubbles to move
         </div>
       )}
