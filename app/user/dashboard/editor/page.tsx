@@ -67,9 +67,14 @@ export default function EditorPage() {
   const [selectedBubbleId, setSelectedBubbleId] = useState<number | null>(null)
   const { toast } = useToast()
   const [isAddingBubble, setIsAddingBubble] = useState(false)
+  const [fonts, setFonts] = useState<Array<{ id: number; name: string; file_url?: string }>>([])
 
   useEffect(() => {
     fetchFiles()
+  }, [])
+
+  useEffect(() => {
+    fetchFonts()
   }, [])
 
   const handleMaximize = () => {
@@ -422,6 +427,15 @@ export default function EditorPage() {
     )
   }
 
+  const fetchFonts = async () => {
+    try {
+      const response = await apiRequest("/v1/fonts/", {}, token!)
+      setFonts(response || [])
+    } catch (error: any) {
+      console.error("Error fetching fonts:", error)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -558,6 +572,7 @@ export default function EditorPage() {
                                         onBubbleTextUpdate={handleBubbleTextUpdate}
                                         onCanvasDoubleClick={handleCanvasDoubleClick}
                                         onBubbleUpdate={updatePageBubbleLocally}
+                                        fonts={fonts}
                                       />
                                     ) : (
                                       <img

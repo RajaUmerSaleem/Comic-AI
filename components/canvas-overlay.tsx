@@ -27,6 +27,7 @@ interface CanvasOverlayProps {
   onCanvasDoubleClick?: (coordinates: number[][]) => void
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
   isExporting?: boolean
+  fonts?: Array<{ id: number; name: string; file_url?: string }> // ADD THIS
 }
 
 export function CanvasOverlay({
@@ -41,6 +42,7 @@ export function CanvasOverlay({
   onCanvasDoubleClick,
   onBubbleUpdate,
   isExporting = false,
+  fonts = [], // ADD THIS WITH DEFAULT
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -158,11 +160,14 @@ export function CanvasOverlay({
       // Set font properties - APPLY FONT CHANGES IMMEDIATELY
       const fontSize = Math.max(12, Math.min((bubble.font_size || 14) * Math.min(scaleX, scaleY), maxHeight / 4))
 
-      // Apply font family if font_id is available
-      let fontFamily = "Arial"
-      if (bubble.font_id) {
-        // You might want to map font IDs to actual font names here
-        fontFamily = "Arial" // Default for now, but this should be dynamic based on font_id
+      // Apply font family if font_id is available - USE FONTS PROP
+      let fontFamily = "Arial" // Default fallback
+      if (bubble.font_id && fonts) {
+        const font = fonts.find((f) => f.id === bubble.font_id)
+        if (font) {
+          // Use the actual font name from the fonts array
+          fontFamily = font.name
+        }
       }
 
       ctx.font = `${fontSize}px ${fontFamily}`
@@ -531,7 +536,7 @@ export function CanvasOverlay({
 
   useEffect(() => {
     redrawCanvas()
-  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints, editingBubble, draggedBubble])
+  }, [speechBubbles, selectedBubbleId, isAddingBubble, polygonPoints, editingBubble, draggedBubble, fonts])
 
   useEffect(() => {
     setIsDrawing(isAddingBubble)

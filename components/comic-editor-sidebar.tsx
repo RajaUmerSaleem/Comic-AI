@@ -277,11 +277,11 @@ export function ComicEditorSidebar({
     // Update local font mapping immediately
     setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
 
-    // Update local state immediately for real-time preview
+    // Update local state immediately for real-time preview - FORCE REDRAW
     if (onBubbleUpdate) {
       onBubbleUpdate(pageId, bubbleId, {
         font_id: fontId,
-        // Force a re-render by updating other properties too
+        // Force a re-render by updating translation with current value
         translation: bubble.translation || "",
         font_size: bubble.font_size || 12,
         font_color: bubble.font_color || [0, 0, 0],
@@ -310,6 +310,9 @@ export function ComicEditorSidebar({
       )
 
       toast({ title: "Success", description: "Font updated" })
+
+      // Refresh pages to ensure consistency
+      onPagesUpdate()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -948,11 +951,11 @@ export function ComicEditorSidebar({
                           }
                         />
 
-                        {/* Font Selection */}
+                        {/* Font Family Selection */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
                             <Type className="h-3 w-3" />
-                            <Label className="text-xs">Choose Font</Label>
+                            <Label className="text-xs">Choose Font Family</Label>
                           </div>
                           <Select
                             value={
