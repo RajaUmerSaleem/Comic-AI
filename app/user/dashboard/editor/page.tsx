@@ -293,7 +293,7 @@ export default function EditorPage() {
       case "text_removed":
         return page.text_removed_image_url
       case "text_translated":
-        return page.text_translated_image_url
+        return page.text_removed_image_url
       default:
         return page.page_image_url
     }
