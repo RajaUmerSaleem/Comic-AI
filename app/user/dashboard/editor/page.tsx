@@ -600,7 +600,7 @@ export default function EditorPage() {
                                         )
                                       }
                                     >
-                                      Translated
+                                      Translate
                                     </TabsTrigger>
                                   </TabsList>
                                 </Tabs>
