@@ -79,6 +79,7 @@ interface ComicEditorSidebarProps {
   onPolygonSelect?: (coordinates: number[][]) => void
   isAddingBubble?: boolean
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
+  onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
 }
 
 export function ComicEditorSidebar({
@@ -95,6 +96,7 @@ export function ComicEditorSidebar({
   onPolygonSelect,
   isAddingBubble = false,
   onBubbleUpdate,
+  onBubbleGeometrySave,
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
@@ -110,6 +112,9 @@ export function ComicEditorSidebar({
     mask_coordinates: [[0, 0]],
     text: "",
     translation: "",
+    font_size: 14, // Default font size
+    font_color: [0, 0, 0], // Default font color (black)
+    font_id: 1, // Default font ID (assuming ID 1 exists)
   })
 
   const { toast } = useToast()
@@ -186,6 +191,9 @@ export function ComicEditorSidebar({
         mask_coordinates: [[0, 0]],
         text: "",
         translation: "",
+        font_size: 14,
+        font_color: [0, 0, 0],
+        font_id: 1,
       })
 
       onPagesUpdate()
@@ -283,8 +291,8 @@ export function ComicEditorSidebar({
         font_id: fontId,
         // Force a re-render by updating translation with current value
         translation: bubble.translation || "",
-        font_size: bubble.font_size || 12,
-        font_color: bubble.font_color || [0, 0, 0],
+        font_size: bubble.font_size || 14, // Use default 14 if null
+        font_color: bubble.font_color || [0, 0, 0], // Use default black if null
       })
     }
 
@@ -300,7 +308,7 @@ export function ComicEditorSidebar({
               {
                 bubble_id: bubbleId,
                 translation: bubble.translation || "",
-                font_size: bubble.font_size || 12,
+                font_size: bubble.font_size || 14,
                 font_color: bubble.font_color || [0, 0, 0],
               },
             ],
@@ -310,9 +318,7 @@ export function ComicEditorSidebar({
       )
 
       toast({ title: "Success", description: "Font updated" })
-
-      // Refresh pages to ensure consistency
-      onPagesUpdate()
+      // Removed onPagesUpdate() to prevent flicker and allow real-time update to persist
     } catch (error: any) {
       toast({
         title: "Error",
@@ -393,7 +399,9 @@ export function ComicEditorSidebar({
     }))
   }
 
-  const captureCanvasElementClean = async (element: HTMLElement): Promise<string> => {
+  const captureCanvasElementClean = async (
+    element: HTMLElement,
+  ): Promise<{ dataUrl: string; originalWidth: number; originalHeight: number }> => {
     // Find the canvas element within the container
     const canvasElement = element.querySelector("canvas") as HTMLCanvasElement
     const imageElement = element.querySelector("img") as HTMLImageElement
@@ -403,10 +411,13 @@ export function ComicEditorSidebar({
     }
 
     // Get the export canvas without UI elements
-    const exportCanvas = (canvasElement as any).getExportCanvas?.()
-    if (!exportCanvas) {
+    const exportCanvasResult = (canvasElement as any).getExportCanvas?.()
+    if (!exportCanvasResult) {
       throw new Error("Export canvas not available")
     }
+    const exportCanvas = exportCanvasResult.canvas
+    const originalWidth = exportCanvasResult.originalWidth
+    const originalHeight = exportCanvasResult.originalHeight
 
     // Create a composite canvas with the image and clean bubbles
     const compositeCanvas = document.createElement("canvas")
@@ -425,7 +436,7 @@ export function ComicEditorSidebar({
     // Draw the clean bubbles on top
     ctx.drawImage(exportCanvas, 0, 0)
 
-    return compositeCanvas.toDataURL("image/png")
+    return { dataUrl: compositeCanvas.toDataURL("image/png"), originalWidth, originalHeight }
   }
 
   const exportToPDF = async () => {
@@ -440,7 +451,7 @@ export function ComicEditorSidebar({
 
     setIsExporting(true)
     try {
-      const pdf = new jsPDF("p", "mm", "a4")
+      const pdf = new jsPDF("p", "mm", "a4") // A4: 210mm x 297mm
       const sortedPages = pages.sort((a, b) => a.page_number - b.page_number)
 
       for (let i = 0; i < sortedPages.length; i++) {
@@ -458,22 +469,35 @@ export function ComicEditorSidebar({
         }
 
         if (canvasElement) {
-          // Capture the canvas with clean bubbles (no borders)
-          const dataUrl = await captureCanvasElementClean(canvasElement)
+          // Capture the canvas with clean bubbles (no borders) and original dimensions
+          const { dataUrl, originalWidth, originalHeight } = await captureCanvasElementClean(canvasElement)
 
           if (i > 0) {
             pdf.addPage()
           }
 
-          // Calculate dimensions to fit the page
-          const imgWidth = 190 // A4 width minus margins
-          const imgHeight = 270 // A4 height minus margins
+          const pdfWidth = pdf.internal.pageSize.getWidth()
+          const pdfHeight = pdf.internal.pageSize.getHeight()
+          const margin = 10 // 10mm margin on each side
 
-          pdf.addImage(dataUrl, "PNG", 10, 10, imgWidth, imgHeight)
+          const imgAspectRatio = originalWidth / originalHeight
+
+          let finalImgWidth = pdfWidth - 2 * margin
+          let finalImgHeight = finalImgWidth / imgAspectRatio
+
+          if (finalImgHeight > pdfHeight - 2 * margin) {
+            finalImgHeight = pdfHeight - 2 * margin
+            finalImgWidth = finalImgHeight * imgAspectRatio
+          }
+
+          const xPos = (pdfWidth - finalImgWidth) / 2
+          const yPos = (pdfHeight - finalImgHeight) / 2
+
+          pdf.addImage(dataUrl, "PNG", xPos, yPos, finalImgWidth, finalImgHeight)
 
           // Add page number
           pdf.setFontSize(10)
-          pdf.text(`Page ${page.page_number}`, 10, 290)
+          pdf.text(`Page ${page.page_number}`, margin, pdfHeight - margin)
         }
       }
 
@@ -523,7 +547,7 @@ export function ComicEditorSidebar({
 
         if (canvasElement) {
           // Capture the canvas with clean bubbles (no borders)
-          const dataUrl = await captureCanvasElementClean(canvasElement)
+          const { dataUrl } = await captureCanvasElementClean(canvasElement)
 
           // Convert data URL to blob
           const response = await fetch(dataUrl)
@@ -553,11 +577,6 @@ export function ComicEditorSidebar({
     }
   }
 
-  const getFontName = (fontId: number) => {
-    const font = fonts.find((f) => f.id === fontId)
-    return font ? font.name : "Default Font"
-  }
-
   const exportCurrentImage = async () => {
     if (!selectedFileId || !selectedPageId || !selectedPage) {
       toast({
@@ -584,7 +603,7 @@ export function ComicEditorSidebar({
 
       if (canvasElement) {
         // Capture the canvas with clean bubbles (no borders)
-        const dataUrl = await captureCanvasElementClean(canvasElement)
+        const { dataUrl } = await captureCanvasElementClean(canvasElement)
 
         // Create download link
         const link = document.createElement("a")
@@ -606,6 +625,15 @@ export function ComicEditorSidebar({
     } finally {
       setIsExporting(false)
     }
+  }
+
+  const getFontName = (fontId: number) => {
+    const font = fonts.find((f) => f.id === fontId)
+    return font ? font.name : "Default Font"
+  }
+
+  const onBubbleClick = (bubble: SpeechBubble) => {
+    // Implement bubble click logic here
   }
 
   return (
@@ -745,9 +773,8 @@ export function ComicEditorSidebar({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-screen">
-
-              <div className="space-y-3">
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-3 pr-4">
                 {selectedPage.speech_bubbles.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No speech bubbles detected. Run detection first.
@@ -756,9 +783,10 @@ export function ComicEditorSidebar({
                   selectedPage.speech_bubbles.map((bubble) => (
                     <div
                       key={bubble.bubble_id}
-                      className={`border rounded-lg p-3 ${
+                      className={`border rounded-lg p-3 cursor-pointer ${
                         selectedBubbleId === bubble.bubble_id ? "border-red-500 bg-red-50" : ""
                       }`}
+                      onClick={() => onBubbleUpdate && onBubbleClick(bubble)} // Select bubble on click
                     >
                       <div className="flex justify-between items-start mb-2">
                         <Badge variant="secondary">
@@ -869,7 +897,7 @@ export function ComicEditorSidebar({
                             <input
                               type="number"
                               className="border rounded px-2 py-1 text-sm"
-                              value={bubble.font_size || 12}
+                              value={bubble.font_size || 14} // Default to 14
                               onChange={(e) => {
                                 const fontSize = Number(e.target.value)
                                 // Update local state immediately
@@ -910,7 +938,7 @@ export function ComicEditorSidebar({
                                   selectedPage.page_id,
                                   bubble.bubble_id,
                                   bubble.translation || "",
-                                  bubble.font_size || 12,
+                                  bubble.font_size || 14, // Default to 14
                                   e.target.value,
                                   bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? selectedFontId ?? 1,
                                 )
@@ -972,6 +1000,69 @@ export function ComicEditorSidebar({
                               }))
                             }
                           />
+                          <div className="flex items-center gap-4">
+                            <div className="flex flex-col w-1/2">
+                              <Label className="text-xs">Font Size</Label>
+                              <input
+                                type="number"
+                                className="border rounded px-2 py-1 text-sm"
+                                value={newBubbleData.font_size}
+                                onChange={(e) =>
+                                  setNewBubbleData((prev) => ({
+                                    ...prev,
+                                    font_size: Number(e.target.value),
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="flex flex-col w-1/2">
+                              <Label className="text-xs">Font Color</Label>
+                              <input
+                                type="color"
+                                className="h-9 rounded"
+                                value={rgbArrayToHex(newBubbleData.font_color)}
+                                onChange={(e) =>
+                                  setNewBubbleData((prev) => ({
+                                    ...prev,
+                                    font_color: hexToRgbArray(e.target.value),
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1">
+                              <Type className="h-3 w-3" />
+                              <Label className="text-xs">Choose Font Family</Label>
+                            </div>
+                            <Select
+                              value={newBubbleData.font_id.toString()}
+                              onValueChange={(value) =>
+                                setNewBubbleData((prev) => ({
+                                  ...prev,
+                                  font_id: Number(value),
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="text-xs">
+                                <SelectValue placeholder="Select font">
+                                  {getFontName(newBubbleData.font_id)}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {fonts.map((font) => (
+                                  <SelectItem key={font.id} value={font.id.toString()}>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{font.name}</span>
+                                      {font.file_url && (
+                                        <span className="text-xs text-muted-foreground">Custom Font</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <Button
                             onClick={createBubble}
                             className="w-full"
