@@ -28,7 +28,7 @@ interface CanvasOverlayProps {
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
   onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
   isExporting?: boolean
-  fonts?: Array<{ id: number; name: string; file_url?: string }> // ADD THIS
+  fonts?: Array<{ id: number; name: string; file_url?: string }>
 }
 
 export function CanvasOverlay({
@@ -42,9 +42,9 @@ export function CanvasOverlay({
   onBubbleTextUpdate,
   onCanvasDoubleClick,
   onBubbleUpdate,
-  onBubbleGeometrySave, // New prop
+  onBubbleGeometrySave,
   isExporting = false,
-  fonts = [], // ADD THIS WITH DEFAULT
+  fonts = [],
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -414,20 +414,20 @@ export function CanvasOverlay({
       if (bubble && onBubbleGeometrySave) {
         onBubbleGeometrySave(pageId, bubble.bubble_id, bubble.mask_coordinates, bubble.coordinates)
       }
-      setDraggingVertexIndex(null)
-      setInitialMousePos(null)
-      setInitialVertexPos(null)
-      setIsDraggingVertex(false)
-      setDraggedBubble(null) // Reset draggedBubble as well
     } else if (isDraggingBubble && draggedBubble) {
       const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
       if (bubble && onBubbleGeometrySave) {
         onBubbleGeometrySave(pageId, bubble.bubble_id, bubble.mask_coordinates, bubble.coordinates)
       }
-      setIsDraggingBubble(false)
-      setDraggedBubble(null)
-      setDragOffset({ x: 0, y: 0 })
     }
+    // Always reset dragging states after potential save
+    setIsDraggingBubble(false)
+    setIsDraggingVertex(false)
+    setDraggedBubble(null)
+    setDragOffset({ x: 0, y: 0 })
+    setDraggingVertexIndex(null)
+    setInitialMousePos(null)
+    setInitialVertexPos(null)
   }
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -494,7 +494,7 @@ export function CanvasOverlay({
               height: maxY - minY,
             })
           } else {
-            onBubbleClick?.(bubble)
+            onBubbleClick?.(bubble) // Select bubble on single click
           }
           return
         }
@@ -552,7 +552,7 @@ export function CanvasOverlay({
 
     // Calculate scale factors
     const scaleX = canvas.width / image.naturalWidth
-    const scaleY = canvas.height / image.naturalHeight
+    const scaleY = image.height / image.naturalHeight // Use image.height for correct scaling
 
     // Draw all speech bubbles
     speechBubbles.forEach((bubble) => {

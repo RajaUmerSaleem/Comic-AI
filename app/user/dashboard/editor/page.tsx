@@ -567,7 +567,7 @@ export default function EditorPage() {
                                     </TabsTrigger>
                                     <TabsTrigger
                                       value="text_translated"
-                                      disabled={!pages.every((p) => !!p.text_removed_image_url)}
+                                      disabled={!pages.every((p) => !!p.text_translated_image_url)}
                                     >
                                       Translate
                                     </TabsTrigger>
@@ -665,6 +665,7 @@ export default function EditorPage() {
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
                     onBubbleGeometrySave={saveBubbleGeometryToBackend}
+                    onBubbleClick={handleBubbleClick} // Pass the handler to the sidebar
                   />
                 </TabsContent>
                 <TabsContent value="bubbles">
@@ -683,6 +684,7 @@ export default function EditorPage() {
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
                     onBubbleGeometrySave={saveBubbleGeometryToBackend}
+                    onBubbleClick={handleBubbleClick} // Pass the handler to the sidebar
                   />
                 </TabsContent>
               </Tabs>

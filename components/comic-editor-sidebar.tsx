@@ -80,6 +80,7 @@ interface ComicEditorSidebarProps {
   isAddingBubble?: boolean
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
   onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
+  onBubbleClick?: (bubble: SpeechBubble) => void // Add this prop
 }
 
 export function ComicEditorSidebar({
@@ -97,6 +98,7 @@ export function ComicEditorSidebar({
   isAddingBubble = false,
   onBubbleUpdate,
   onBubbleGeometrySave,
+  onBubbleClick, // Destructure the new prop
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
@@ -632,10 +634,6 @@ export function ComicEditorSidebar({
     return font ? font.name : "Default Font"
   }
 
-  const onBubbleClick = (bubble: SpeechBubble) => {
-    // Implement bubble click logic here
-  }
-
   return (
     <div className="space-y-4">
       {mode === "editor" && (
@@ -786,7 +784,7 @@ export function ComicEditorSidebar({
                       className={`border rounded-lg p-3 cursor-pointer ${
                         selectedBubbleId === bubble.bubble_id ? "border-red-500 bg-red-50" : ""
                       }`}
-                      onClick={() => onBubbleUpdate && onBubbleClick(bubble)} // Select bubble on click
+                      onClick={() => onBubbleClick?.(bubble)} // Directly call onBubbleClick
                     >
                       <div className="flex justify-between items-start mb-2">
                         <Badge variant="secondary">
