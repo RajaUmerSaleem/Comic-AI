@@ -237,7 +237,7 @@ export function ComicEditorSidebar({
     translation: string,
     font_size?: number,
     font_color?: string,
-    font_id?: number,
+    font_id?: number, // This is the font_id being passed in
   ) => {
     try {
       await apiRequest(
@@ -246,13 +246,13 @@ export function ComicEditorSidebar({
           method: "PUT",
           body: JSON.stringify({
             page_id: pageId,
-            font_id: font_id || bubbleFonts[bubbleId] || 1,
             bubble_data: [
               {
                 bubble_id: bubbleId,
                 translation,
                 font_size,
                 font_color: font_color ? hexToRgbArray(font_color) : undefined,
+                font_id: font_id, // Use the passed font_id directly here
               },
             ],
           }),
@@ -266,7 +266,7 @@ export function ComicEditorSidebar({
           translation,
           font_size: font_size || undefined,
           font_color: font_color ? hexToRgbArray(font_color) : undefined,
-          font_id: font_id || bubbleFonts[bubbleId] || 1,
+          font_id: font_id || undefined, // Use the passed font_id for local update
         })
       }
 
@@ -287,40 +287,28 @@ export function ComicEditorSidebar({
     // Update local font mapping immediately
     setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
 
-    // Update local state immediately for real-time preview - FORCE REDRAW
+    // Update local state immediately for real-time preview
     if (onBubbleUpdate) {
       onBubbleUpdate(pageId, bubbleId, {
-        font_id: fontId,
-        // Force a re-render by updating translation with current value
+        font_id: fontId, // Use the new fontId passed to this function
         translation: bubble.translation || "",
-        font_size: bubble.font_size || 14, // Use default 14 if null
-        font_color: bubble.font_color || [0, 0, 0], // Use default black if null
+        font_size: bubble.font_size || 14,
+        font_color: bubble.font_color || [0, 0, 0],
       })
     }
 
     try {
-      await apiRequest(
-        `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            page_id: pageId,
-            font_id: fontId,
-            bubble_data: [
-              {
-                bubble_id: bubbleId,
-                translation: bubble.translation || "",
-                font_size: bubble.font_size || 14,
-                font_color: bubble.font_color || [0, 0, 0],
-              },
-            ],
-          }),
-        },
-        token!,
+      // Call updateBubbleTranslation with all current bubble data and the new fontId
+      await updateBubbleTranslation(
+        pageId,
+        bubbleId,
+        bubble.translation || "", // Current translation
+        bubble.font_size || 14, // Current font size
+        bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000", // Current font color
+        fontId, // The new fontId
       )
 
       toast({ title: "Success", description: "Font updated" })
-      // Removed onPagesUpdate() to prevent flicker and allow real-time update to persist
     } catch (error: any) {
       toast({
         title: "Error",

@@ -330,7 +330,6 @@ export default function EditorPage() {
           method: "PUT",
           body: JSON.stringify({
             page_id: selectedPageId,
-            font_id: 1, // Default font ID, will be overridden by actual font_id from bubble data
             bubble_data: [
               {
                 bubble_id: bubbleId,
