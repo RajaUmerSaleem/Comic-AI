@@ -185,7 +185,8 @@ export function CanvasOverlay({
       const maxHeight = (maxY - minY) * 0.8
 
       // Set font properties - APPLY FONT CHANGES IMMEDIATELY
-      const fontSize = Math.max(12, Math.min((bubble.font_size || 14) * Math.min(scaleX, scaleY), maxHeight / 4))
+      // Changed Math.max(12, ...) to Math.max(1, ...) to allow smaller font sizes if set
+      const fontSize = Math.max(1, Math.min((bubble.font_size || 14) * Math.min(scaleX, scaleY), maxHeight / 4))
 
       // Apply font family if font_id is available - USE FONTS PROP
       let fontFamily = "Arial" // Default fallback
@@ -552,7 +553,7 @@ export function CanvasOverlay({
 
     // Calculate scale factors
     const scaleX = canvas.width / image.naturalWidth
-    const scaleY = image.height / image.naturalHeight // Use image.height for correct scaling
+    const scaleY = canvas.height / image.naturalHeight // Use image.height for correct scaling
 
     // Draw all speech bubbles
     speechBubbles.forEach((bubble) => {
@@ -608,8 +609,8 @@ export function CanvasOverlay({
 
     // Create a new canvas for export
     const exportCanvas = document.createElement("canvas")
-    exportCanvas.width = canvas.width
-    exportCanvas.height = canvas.height
+    exportCanvas.width = image.naturalWidth // Use original image dimensions for export canvas
+    exportCanvas.height = image.naturalHeight
 
     const ctx = exportCanvas.getContext("2d")
     if (!ctx) return null
@@ -617,13 +618,9 @@ export function CanvasOverlay({
     // Clear canvas
     ctx.clearRect(0, 0, exportCanvas.width, exportCanvas.height)
 
-    // Calculate scale factors
-    const scaleX = exportCanvas.width / image.naturalWidth
-    const scaleY = exportCanvas.height / image.naturalHeight
-
-    // Draw all speech bubbles WITHOUT UI elements
+    // Draw all speech bubbles WITHOUT UI elements, using 1:1 scale
     speechBubbles.forEach((bubble) => {
-      drawPolygonWithText(ctx, bubble, scaleX, scaleY, true) // hideUI = true
+      drawPolygonWithText(ctx, bubble, 1, 1, true) // hideUI = true, scaleX=1, scaleY=1
     })
 
     return {

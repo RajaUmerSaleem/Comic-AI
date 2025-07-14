@@ -439,7 +439,7 @@ export default function EditorPage() {
   ) => {
     try {
       await apiRequest(
-        `/v1/pages/${pageId}/bubble/${bubbleId}/geometry`, // Assuming this endpoint exists
+        `/v1/pages/bubble/${bubbleId}`, 
         {
           method: "PUT",
           body: JSON.stringify({ mask_coordinates, coordinates }),
