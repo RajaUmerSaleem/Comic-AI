@@ -79,8 +79,8 @@ interface ComicEditorSidebarProps {
   onPolygonSelect?: (coordinates: number[][]) => void
   isAddingBubble?: boolean
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
-  onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
-  onBubbleClick?: (bubble: SpeechBubble) => void // Add this prop
+  onBubbleGeometrySave?: (pageId: number, bubble: SpeechBubble) => void // Updated type definition
+  onBubbleClick?: (bubble: SpeechBubble) => void // Destructure the new prop
 }
 
 export function ComicEditorSidebar({
@@ -125,8 +125,16 @@ export function ComicEditorSidebar({
   const selectedBubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === selectedBubbleId)
 
   const fetchFonts = async () => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to fetch fonts.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      const response = await apiRequest("/v1/fonts/", {}, token!)
+      const response = await apiRequest("/v1/fonts/", {}, token)
       setFonts(response || [])
     } catch (error: any) {
       toast({
@@ -171,6 +179,15 @@ export function ComicEditorSidebar({
   const createBubble = async () => {
     if (!selectedPageId) return
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create a bubble.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       await apiRequest(
         "/v1/pages/bubble",
@@ -178,7 +195,7 @@ export function ComicEditorSidebar({
           method: "POST",
           body: JSON.stringify({ ...newBubbleData, page_id: selectedPageId }),
         },
-        token!,
+        token,
       )
 
       toast({
@@ -218,8 +235,17 @@ export function ComicEditorSidebar({
       return
     }
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to delete a bubble.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
-      await apiRequest(`/v1/pages/bubble/${bubbleId}`, { method: "DELETE" }, token!)
+      await apiRequest(`/v1/pages/bubble/${bubbleId}`, { method: "DELETE" }, token)
       toast({ title: "Success", description: "Speech bubble deleted" })
       onPagesUpdate()
     } catch (error: any) {
@@ -237,8 +263,16 @@ export function ComicEditorSidebar({
     translation: string,
     font_size?: number,
     font_color?: string,
-    font_id?: number, // This is the font_id being passed in
+    font_id?: number,
   ) => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to update translation.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
       await apiRequest(
         `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
@@ -252,21 +286,20 @@ export function ComicEditorSidebar({
                 translation,
                 font_size,
                 font_color: font_color ? hexToRgbArray(font_color) : undefined,
-                font_id: font_id, // Use the passed font_id directly here
+                font_id: font_id,
               },
             ],
           }),
         },
-        token!,
+        token,
       )
 
-      // Update local state for real-time preview
       if (onBubbleUpdate) {
         onBubbleUpdate(pageId, bubbleId, {
           translation,
           font_size: font_size || undefined,
           font_color: font_color ? hexToRgbArray(font_color) : undefined,
-          font_id: font_id || undefined, // Use the passed font_id for local update
+          font_id: font_id || undefined,
         })
       }
 
@@ -281,31 +314,26 @@ export function ComicEditorSidebar({
   }
 
   const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number) => {
-    const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
-    if (!bubble) return
-
-    // Update local font mapping immediately
-    setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
-
-    // Update local state immediately for real-time preview
-    if (onBubbleUpdate) {
-      onBubbleUpdate(pageId, bubbleId, {
-        font_id: fontId, // Use the new fontId passed to this function
-        translation: bubble.translation || "",
-        font_size: bubble.font_size || 14,
-        font_color: bubble.font_color || [0, 0, 0],
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to update font.",
+        variant: "destructive",
       })
+      return
     }
-
     try {
-      // Call updateBubbleTranslation with all current bubble data and the new fontId
-      await updateBubbleTranslation(
-        pageId,
-        bubbleId,
-        bubble.translation || "", // Current translation
-        bubble.font_size || 14, // Current font size
-        bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000", // Current font color
-        fontId, // The new fontId
+      await apiRequest(
+        `/v1/pages/${pageId}/bubble/${bubbleId}/font`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            page_id: pageId,
+            bubble_id: bubbleId,
+            font_id: fontId,
+          }),
+        },
+        token,
       )
 
       toast({ title: "Success", description: "Font updated" })
@@ -318,7 +346,7 @@ export function ComicEditorSidebar({
     }
   }
 
-  function hexToRgbArray(hex: string): [number, number, number] {
+  const hexToRgbArray = (hex: string): number[] => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result
       ? [Number.parseInt(result[1], 16), Number.parseInt(result[2], 16), Number.parseInt(result[3], 16)]
@@ -326,9 +354,17 @@ export function ComicEditorSidebar({
   }
 
   const updateBubbleText = async (pageId: number, bubbleId: number, text: string) => {
-    // Update local state immediately for real-time preview
     if (onBubbleUpdate) {
       onBubbleUpdate(pageId, bubbleId, { text })
+    }
+
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to update text.",
+        variant: "destructive",
+      })
+      return
     }
 
     try {
@@ -337,7 +373,7 @@ export function ComicEditorSidebar({
         {
           method: "PUT",
         },
-        token!,
+        token,
       )
 
       toast({ title: "Success", description: "Text updated" })

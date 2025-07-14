@@ -26,7 +26,7 @@ interface CanvasOverlayProps {
   onBubbleTextUpdate?: (bubbleId: number, text: string, translation: string) => void
   onCanvasDoubleClick?: (coordinates: number[][]) => void
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
-  onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
+  onBubbleGeometrySave?: (pageId: number, bubble: SpeechBubble) => void // Updated type definition
   isExporting?: boolean
   fonts?: Array<{ id: number; name: string; file_url?: string }>
 }
@@ -413,12 +413,12 @@ export function CanvasOverlay({
     if (isDraggingVertex && draggedBubble) {
       const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
       if (bubble && onBubbleGeometrySave) {
-        onBubbleGeometrySave(pageId, bubble.bubble_id, bubble.mask_coordinates, bubble.coordinates)
+        onBubbleGeometrySave(pageId, bubble) // Pass the entire bubble object
       }
     } else if (isDraggingBubble && draggedBubble) {
       const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
       if (bubble && onBubbleGeometrySave) {
-        onBubbleGeometrySave(pageId, bubble.bubble_id, bubble.mask_coordinates, bubble.coordinates)
+        onBubbleGeometrySave(pageId, bubble) // Pass the entire bubble object
       }
     }
     // Always reset dragging states after potential save

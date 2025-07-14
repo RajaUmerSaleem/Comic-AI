@@ -149,8 +149,17 @@ export default function EditorPage() {
   }, [processingTasks])
 
   const fetchFiles = async () => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to fetch files.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return
+    }
     try {
-      const response = await apiRequest("/v1/file/", {}, token!)
+      const response = await apiRequest("/v1/file/", {}, token)
       setFiles(response.files)
     } catch (error: any) {
       toast({
@@ -175,8 +184,16 @@ export default function EditorPage() {
   }
 
   const fetchPages = async (fileId: number) => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to fetch pages.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      const response = await apiRequest(`/v1/pages/${fileId}`, {}, token!)
+      const response = await apiRequest(`/v1/pages/${fileId}`, {}, token)
       setPages(response)
     } catch (error: any) {
       toast({
@@ -209,12 +226,21 @@ export default function EditorPage() {
   const startDetection = async (pageId?: number) => {
     if (!selectedFileId) return
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to start detection.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const url = pageId
         ? `/v1/file/async-detect?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-detect?file_id=${selectedFileId}`
 
-      const response = await apiRequest(url, { method: "POST" }, token!)
+      const response = await apiRequest(url, { method: "POST" }, token)
 
       const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`
       addTask(taskKey, response.task_id)
@@ -235,12 +261,21 @@ export default function EditorPage() {
   const startTextRemoval = async (pageId?: number) => {
     if (!selectedFileId) return
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to start text removal.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const url = pageId
         ? `/v1/file/async-remove-text?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-remove-text?file_id=${selectedFileId}`
 
-      const response = await apiRequest(url, { method: "POST" }, token!)
+      const response = await apiRequest(url, { method: "POST" }, token)
 
       const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`
       addTask(taskKey, response.task_id)
@@ -259,8 +294,13 @@ export default function EditorPage() {
   }
 
   const pollTaskStatus = async (taskId: string, taskKey: string) => {
+    if (!token) {
+      console.error("Authentication token missing, cannot poll task status.")
+      removeTask(taskKey)
+      return
+    }
     try {
-      const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token!)
+      const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token)
 
       if (response.status === "SUCCESS" || response.status === "FAILED") {
         removeTask(taskKey)
@@ -283,6 +323,7 @@ export default function EditorPage() {
       }
     } catch (error: any) {
       console.error("Error polling task status:", error)
+      removeTask(taskKey)
     }
   }
 
@@ -315,12 +356,21 @@ export default function EditorPage() {
   const handleBubbleTextUpdate = async (bubbleId: number, text: string, translation: string) => {
     if (!selectedPageId) return
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to update bubble text.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       // Update text
       await apiRequest(
         `/v1/pages/${selectedPageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
         { method: "PUT" },
-        token!,
+        token,
       )
 
       // Update translation
@@ -338,7 +388,7 @@ export default function EditorPage() {
             ],
           }),
         },
-        token!,
+        token,
       )
 
       toast({ title: "Success", description: "Bubble updated successfully" })
@@ -360,8 +410,16 @@ export default function EditorPage() {
   const handleCanvasDoubleClick = async (coordinates: number[][]) => {
     if (!selectedPageId) return
 
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create a bubble.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
-      // Calculate bounding box from polygon
       let minX = Number.POSITIVE_INFINITY,
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
@@ -381,9 +439,9 @@ export default function EditorPage() {
         mask_coordinates: coordinates,
         text: "",
         translation: "",
-        font_size: 14, // Default font size
-        font_color: [0, 0, 0], // Default font color (black)
-        font_id: 1, // Default font ID (assuming ID 1 exists)
+        font_size: 14,
+        font_color: [0, 0, 0],
+        font_id: 1,
       }
 
       await apiRequest(
@@ -392,7 +450,7 @@ export default function EditorPage() {
           method: "POST",
           body: JSON.stringify(newBubbleData),
         },
-        token!,
+        token,
       )
 
       toast({
@@ -400,7 +458,6 @@ export default function EditorPage() {
         description: "Speech bubble created successfully",
       })
 
-      // Refresh pages
       if (selectedFileId) {
         fetchPages(selectedFileId)
       }
@@ -413,7 +470,6 @@ export default function EditorPage() {
     }
   }
 
-  // Function to update pages state locally for real-time updates
   const updatePageBubbleLocally = (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => {
     setPages((prevPages) =>
       prevPages.map((page) =>
@@ -429,35 +485,55 @@ export default function EditorPage() {
     )
   }
 
-  // Function to save bubble geometry to backend
-  const saveBubbleGeometryToBackend = async (
-    pageId: number,
-    bubbleId: number,
-    mask_coordinates: number[][],
-    coordinates: number[],
-  ) => {
+  const saveBubbleGeometryToBackend = async (pageId: number, bubble: SpeechBubble) => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to save bubble geometry.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
       await apiRequest(
-        `/v1/pages/bubble/${bubbleId}`, 
+        `/v1/pages/bubble/${bubble.bubble_id}`,
         {
           method: "PUT",
-          body: JSON.stringify({ mask_coordinates, coordinates }),
+          body: JSON.stringify({
+            bubble_no: bubble.bubble_no, // Added this field
+            coordinates_xyxy: bubble.coordinates,
+            mask_coordinates_xyxy: bubble.mask_coordinates,
+            text: bubble.text,
+            translation: bubble.translation,
+            font_id: bubble.font_id,
+            font_size: bubble.font_size,
+            font_color: bubble.font_color,
+            text_coordinates_xyxy: bubble.coordinates,
+          }),
         },
-        token!,
+        token,
       )
       toast({ title: "Success", description: "Bubble shape saved" })
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to save bubble shape: " + error.message,
+        description: "Failed to save bubble shape: " + (error.message || JSON.stringify(error)),
         variant: "destructive",
       })
     }
   }
 
   const fetchFonts = async () => {
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to fetch fonts.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      const response = await apiRequest("/v1/fonts/", {}, token!)
+      const response = await apiRequest("/v1/fonts/", {}, token)
       setFonts(response || [])
     } catch (error: any) {
       console.error("Error fetching fonts:", error)
