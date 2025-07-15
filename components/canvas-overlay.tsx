@@ -1,7 +1,18 @@
 "use client"
 
+import { SelectItem } from "@/components/ui/select"
+
+import { SelectContent } from "@/components/ui/select"
+
+import { SelectValue } from "@/components/ui/select"
+
+import { SelectTrigger } from "@/components/ui/select"
+
+import { Select } from "@/components/ui/select"
+
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
+import { hexToRgbArray, rgbArrayToHex } from "@/lib/utilsss" // Import from utils
 
 interface SpeechBubble {
   bubble_id: number
@@ -90,6 +101,18 @@ export function CanvasOverlay({
   const [initialTempBoxMousePos, setInitialTempBoxMousePos] = useState<{ x: number; y: number } | null>(null)
   const [initialTempBoxVertexPos, setInitialTempBoxVertexPos] = useState<{ x: number; y: number } | null>(null)
   const [initialTempBoxPolygon, setInitialTempBoxPolygon] = useState<number[][] | null>(null)
+
+  // New states for temporary box font properties
+  const [tempBoxFontSize, setTempBoxFontSize] = useState<number>(16)
+  const [tempBoxFontColor, setTempBoxFontColor] = useState<number[]>([0, 0, 0]) // Default black
+  const [tempBoxFontId, setTempBoxFontId] = useState<number>(fonts[0]?.id || 1) // Default to first font or 1
+
+  useEffect(() => {
+    if (fonts.length > 0 && tempBoxFontId === 1) {
+      // Only set if default and fonts are loaded
+      setTempBoxFontId(fonts[0].id)
+    }
+  }, [fonts, tempBoxFontId])
 
   const isPointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
     const [x, y] = point
@@ -271,37 +294,63 @@ export function CanvasOverlay({
   }
 
   // New function to draw the temporary box
-  const drawTempBox = (ctx: CanvasRenderingContext2D, coordinates: number[][], scaleX: number, scaleY: number) => {
+  const drawTempBox = (
+    ctx: CanvasRenderingContext2D,
+    coordinates: number[][],
+    scaleX: number,
+    scaleY: number,
+    hideUI = false, // Added hideUI parameter
+    boxText: string,
+    boxFontSize: number,
+    boxFontColor: number[],
+    boxFontId: number,
+    availableFonts: Array<{ id: number; name: string; file_url?: string }>,
+  ) => {
     if (!coordinates || coordinates.length === 0) return
 
-    // Draw polygon outline (solid border)
-    ctx.beginPath()
-    ctx.strokeStyle = "#8b5cf6" // Purple
-    ctx.lineWidth = 2
-    ctx.setLineDash([]) // Solid line
-    const firstPoint = coordinates[0]
-    ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
-    for (let i = 1; i < coordinates.length; i++) {
-      const point = coordinates[i]
-      ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
-    }
-    ctx.closePath()
-    ctx.stroke()
-
-    // Fill polygon with semi-transparent background
-    ctx.fillStyle = "rgba(139, 92, 246, 0.1)" // Light purple fill
-    ctx.fill()
-
-    // Draw resize handles (dots) on corners
-    ctx.fillStyle = "#8b5cf6" // Purple for handles
-    coordinates.forEach((point) => {
+    // Only draw UI elements (borders, handles) if not hiding UI
+    if (!hideUI) {
+      // Draw polygon outline (solid border)
       ctx.beginPath()
-      ctx.arc(point[0] * scaleX, point[1] * scaleY, 5, 0, 2 * Math.PI) // Radius 5
-      ctx.fill()
-    })
+      ctx.strokeStyle = "#8b5cf6" // Purple
+      ctx.lineWidth = 2
+      ctx.setLineDash([]) // Solid line
+      const firstPoint = coordinates[0]
+      ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
+      for (let i = 1; i < coordinates.length; i++) {
+        const point = coordinates[i]
+        ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
+      }
+      ctx.closePath()
+      ctx.stroke()
 
-    // Draw text if editing is not active
-    if (!isEditingTempBoxText && tempBoxText) {
+      // Fill polygon with semi-transparent background
+      ctx.fillStyle = "rgba(139, 92, 246, 0.1)" // Light purple fill
+      ctx.fill()
+
+      // Draw resize handles (dots) on corners
+      ctx.fillStyle = "#8b5cf6" // Purple for handles
+      coordinates.forEach((point) => {
+        ctx.beginPath()
+        ctx.arc(point[0] * scaleX, point[1] * scaleY, 5, 0, 2 * Math.PI) // Radius 5
+        ctx.fill()
+      })
+    } else {
+      // For export: Fill polygon with solid white background
+      ctx.beginPath()
+      const firstPoint = coordinates[0]
+      ctx.moveTo(firstPoint[0] * scaleX, firstPoint[1] * scaleY)
+      for (let i = 1; i < coordinates.length; i++) {
+        const point = coordinates[i]
+        ctx.lineTo(point[0] * scaleX, point[1] * scaleY)
+      }
+      ctx.closePath()
+      ctx.fillStyle = "rgba(255, 255, 255, 1)" // Solid white background for export
+      ctx.fill()
+    }
+
+    // Draw text if editing is not active (or if hiding UI for export)
+    if (!isEditingTempBoxText || hideUI) {
       // Calculate bounds for text positioning
       let minX = Number.POSITIVE_INFINITY,
         maxX = Number.NEGATIVE_INFINITY,
@@ -319,12 +368,21 @@ export function CanvasOverlay({
       const maxWidth = (maxX - minX) * 0.9
       const maxHeight = (maxY - minY) * 0.9
 
-      ctx.font = `16px Arial` // Default font for temp box
+      // Apply font family if font_id is available
+      let fontFamily = "Arial" // Default fallback
+      if (boxFontId && availableFonts) {
+        const font = availableFonts.find((f) => f.id === boxFontId)
+        if (font) {
+          fontFamily = font.name
+        }
+      }
+
+      ctx.font = `${boxFontSize * Math.min(scaleX, scaleY)}px ${fontFamily}` // Apply font size and family
       ctx.textAlign = "center"
       ctx.textBaseline = "middle"
-      ctx.fillStyle = "#000000" // Black text
+      ctx.fillStyle = `rgb(${boxFontColor[0]}, ${boxFontColor[1]}, ${boxFontColor[2]})` // Apply font color
 
-      const words = tempBoxText.split(/\s+/)
+      const words = boxText.split(/\s+/)
       const lines: string[] = []
       let currentLine = ""
 
@@ -342,7 +400,7 @@ export function CanvasOverlay({
         lines.push(currentLine)
       }
 
-      const lineHeight = 16 * 1.2
+      const lineHeight = boxFontSize * Math.min(scaleX, scaleY) * 1.2
       const startY = centerY - ((lines.length - 1) * lineHeight) / 2
 
       lines.forEach((line, index) => {
@@ -766,6 +824,9 @@ export function CanvasOverlay({
         ]
         setTempBoxCoordinates(defaultPolygon)
         setTempBoxText("") // Initialize with empty text
+        setTempBoxFontSize(16) // Reset to default font size
+        setTempBoxFontColor([0, 0, 0]) // Reset to default font color (black)
+        setTempBoxFontId(fonts[0]?.id || 1) // Reset to default font ID
         setIsEditingTempBoxText(true)
 
         const canvas = canvasRef.current
@@ -820,6 +881,9 @@ export function CanvasOverlay({
   const handleCancelTempBoxEdit = () => {
     setTempBoxCoordinates(null) // Discard the temporary box
     setTempBoxText("")
+    setTempBoxFontSize(16) // Reset to default
+    setTempBoxFontColor([0, 0, 0]) // Reset to default
+    setTempBoxFontId(fonts[0]?.id || 1) // Reset to default
     setIsEditingTempBoxText(false)
   }
 
@@ -836,7 +900,7 @@ export function CanvasOverlay({
 
     // Calculate scale factors
     const scaleX = canvas.width / image.naturalWidth
-    const scaleY = image.height / image.naturalHeight // Use image.height for correct scaling
+    const scaleY = canvas.height / image.naturalHeight // Use image.height for correct scaling
 
     // Draw all speech bubbles
     speechBubbles.forEach((bubble) => {
@@ -881,7 +945,18 @@ export function CanvasOverlay({
       // Draw temporary box if it exists
       if (tempBoxCoordinates && !isEditingTempBoxText) {
         // Only draw if not actively editing text
-        drawTempBox(ctx, tempBoxCoordinates, scaleX, scaleY)
+        drawTempBox(
+          ctx,
+          tempBoxCoordinates,
+          scaleX,
+          scaleY,
+          false, // hideUI = false for display
+          tempBoxText,
+          tempBoxFontSize,
+          tempBoxFontColor,
+          tempBoxFontId,
+          fonts,
+        )
       }
     }
   }
@@ -911,6 +986,22 @@ export function CanvasOverlay({
     speechBubbles.forEach((bubble) => {
       drawPolygonWithText(ctx, bubble, 1, 1, true) // hideUI = true, scaleX=1, scaleY=1
     })
+
+    // Draw temporary box if it exists for export
+    if (tempBoxCoordinates) {
+      drawTempBox(
+        ctx,
+        tempBoxCoordinates,
+        1, // scaleX = 1 for export
+        1, // scaleY = 1 for export
+        true, // hideUI = true for export
+        tempBoxText,
+        tempBoxFontSize,
+        tempBoxFontColor,
+        tempBoxFontId,
+        fonts,
+      )
+    }
 
     return {
       canvas: exportCanvas,
@@ -956,6 +1047,10 @@ export function CanvasOverlay({
     isDraggingBubble,
     tempBoxCoordinates, // Added for temporary box
     isEditingTempBoxText, // Added for temporary box
+    tempBoxText, // Added for temporary box text changes
+    tempBoxFontSize, // Added for temporary box font changes
+    tempBoxFontColor, // Added for temporary box font changes
+    tempBoxFontId, // Added for temporary box font changes
   ])
 
   useEffect(() => {
@@ -970,7 +1065,7 @@ export function CanvasOverlay({
     if (canvasRef.current) {
       ;(canvasRef.current as any).getExportCanvas = getExportCanvas
     }
-  }, [speechBubbles])
+  }, [speechBubbles, tempBoxCoordinates, tempBoxText, tempBoxFontSize, tempBoxFontColor, tempBoxFontId, fonts]) // Depend on temp box states for export
 
   const getCursorStyle = () => {
     if (isAddingBubble) return "crosshair"
@@ -1100,6 +1195,46 @@ export function CanvasOverlay({
                 }}
                 autoFocus
               />
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col w-1/2">
+                <label className="text-xs font-medium text-gray-700">Font Size</label>
+                <input
+                  type="number"
+                  className="border rounded px-2 py-1 text-sm"
+                  value={tempBoxFontSize}
+                  onChange={(e) => setTempBoxFontSize(Number(e.target.value))}
+                />
+              </div>
+              <div className="flex flex-col w-1/2">
+                <label className="text-xs font-medium text-gray-700">Font Color</label>
+                <input
+                  type="color"
+                  className="h-9 rounded"
+                  value={rgbArrayToHex(tempBoxFontColor)}
+                  onChange={(e) => setTempBoxFontColor(hexToRgbArray(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-gray-700 block mb-1">Font Family</label>
+              <Select value={tempBoxFontId.toString()} onValueChange={(value) => setTempBoxFontId(Number(value))}>
+                <SelectTrigger className="text-xs">
+                  <SelectValue placeholder="Select font">
+                    {fonts.find((f) => f.id === tempBoxFontId)?.name || "Select font"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {fonts.map((font) => (
+                    <SelectItem key={font.id} value={font.id.toString()}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{font.name}</span>
+                        {font.file_url && <span className="text-xs text-muted-foreground">Custom Font</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex gap-1">
               <button

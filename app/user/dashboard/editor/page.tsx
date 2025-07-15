@@ -334,7 +334,7 @@ export default function EditorPage() {
       case "text_removed":
         return page.text_removed_image_url
       case "text_translated":
-        return page.text_removed_image_url
+        return page.text_translated_image_url // Corrected to display the translated image
       default:
         return page.page_image_url
     }
@@ -435,13 +435,14 @@ export default function EditorPage() {
       const newBubbleData = {
         page_id: selectedPageId,
         bubble_no: 0,
-        coordinates: [minX, minY, maxX, maxY],
-        mask_coordinates: coordinates,
+        coordinates_xyxy: [minX, minY, maxX, maxY], // Changed from 'coordinates'
+        mask_coordinates_xyxy: coordinates, // Changed from 'mask_coordinates'
         text: "",
         translation: "",
         font_size: 14,
         font_color: [0, 0, 0],
         font_id: 1,
+        text_coordinates_xyxy: [minX, minY, maxX, maxY], // Added this field
       }
 
       await apiRequest(
@@ -739,8 +740,7 @@ export default function EditorPage() {
                     onPolygonSelect={handlePolygonSelect}
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
-                    onBubbleGeometrySave={saveBubbleGeometryToBackend}
-                    onBubbleClick={handleBubbleClick} // Pass the handler to the sidebar
+                    onBubbleClick={handleBubbleClick} 
                   />
                 </TabsContent>
                 <TabsContent value="bubbles">
@@ -758,8 +758,7 @@ export default function EditorPage() {
                     onPolygonSelect={handlePolygonSelect}
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
-                    onBubbleGeometrySave={saveBubbleGeometryToBackend}
-                    onBubbleClick={handleBubbleClick} // Pass the handler to the sidebar
+                    onBubbleClick={handleBubbleClick}
                   />
                 </TabsContent>
               </Tabs>
