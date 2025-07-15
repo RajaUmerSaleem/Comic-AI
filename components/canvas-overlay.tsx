@@ -1,18 +1,12 @@
 "use client"
 
-import { SelectItem } from "@/components/ui/select"
-
-import { SelectContent } from "@/components/ui/select"
-
-import { SelectValue } from "@/components/ui/select"
-
-import { SelectTrigger } from "@/components/ui/select"
-
-import { Select } from "@/components/ui/select"
-
+import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import { hexToRgbArray, rgbArrayToHex } from "@/lib/utilsss" // Import from utils
+import { apiRequest } from "@/lib/api"
+import { useAuth } from "./auth-provider"
+import { toast } from "@/hooks/use-toast"
 
 interface SpeechBubble {
   bubble_id: number
@@ -74,6 +68,7 @@ export function CanvasOverlay({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [isDraggingBubble, setIsDraggingBubble] = useState(false)
   const [isDraggingVertex, setIsDraggingVertex] = useState(false)
+  const { token } = useAuth()
   const [draggingVertexIndex, setDraggingVertexIndex] = useState<number | null>(null)
   const [initialMousePos, setInitialMousePos] = useState<{
     x: number
@@ -98,8 +93,14 @@ export function CanvasOverlay({
     width: 0,
     height: 0,
   })
-  const [initialTempBoxMousePos, setInitialTempBoxMousePos] = useState<{ x: number; y: number } | null>(null)
-  const [initialTempBoxVertexPos, setInitialTempBoxVertexPos] = useState<{ x: number; y: number } | null>(null)
+  const [initialTempBoxMousePos, setInitialTempBoxMousePos] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+  const [initialTempBoxVertexPos, setInitialTempBoxVertexPos] = useState<{
+    x: number
+    y: number
+  } | null>(null)
   const [initialTempBoxPolygon, setInitialTempBoxPolygon] = useState<number[][] | null>(null)
 
   // New states for temporary box font properties
@@ -107,12 +108,43 @@ export function CanvasOverlay({
   const [tempBoxFontColor, setTempBoxFontColor] = useState<number[]>([0, 0, 0]) // Default black
   const [tempBoxFontId, setTempBoxFontId] = useState<number>(fonts[0]?.id || 1) // Default to first font or 1
 
+  // Loading state for API call
+  const [isSavingTempBox, setIsSavingTempBox] = useState(false)
+
   useEffect(() => {
     if (fonts.length > 0 && tempBoxFontId === 1) {
       // Only set if default and fonts are loaded
       setTempBoxFontId(fonts[0].id)
     }
   }, [fonts, tempBoxFontId])
+
+  // API function to create speech bubble
+  const createSpeechBubble = async (bubbleData: {
+    page_id: number
+    bubble_no: number
+    coordinates_xyxy: number[]
+    mask_coordinates_xyxy: number[][]
+    text?: string
+    translation?: string
+    font_id?: number
+    text_coordinates_xyxy?: number[]
+  }) => {
+    try {
+      const result = await apiRequest(
+        "/v1/pages/bubble",
+        {
+          method: "POST",
+          body: JSON.stringify(bubbleData),
+        },
+        token ?? undefined,
+      )
+
+      return result
+    } catch (error) {
+      console.error("Error creating speech bubble:", error)
+      throw error
+    }
+  }
 
   const isPointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
     const [x, y] = point
@@ -356,6 +388,7 @@ export function CanvasOverlay({
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
         maxY = Number.NEGATIVE_INFINITY
+
       for (const point of coordinates) {
         minX = Math.min(minX, point[0] * scaleX)
         maxX = Math.max(maxX, point[0] * scaleX)
@@ -432,7 +465,6 @@ export function CanvasOverlay({
         const [vx, vy] = tempBoxCoordinates[i]
         const distance = Math.sqrt(Math.pow(imageX - vx, 2) + Math.pow(imageY - vy, 2))
         const hitRadius = 10 / Math.min(scaleX, scaleY)
-
         if (distance < hitRadius) {
           setResizingTempBoxVertexIndex(i)
           setIsResizingTempBox(true)
@@ -449,7 +481,6 @@ export function CanvasOverlay({
         // Calculate offset from box center
         const centerX = tempBoxCoordinates.reduce((sum, point) => sum + point[0], 0) / tempBoxCoordinates.length
         const centerY = tempBoxCoordinates.reduce((sum, point) => sum + point[1], 0) / tempBoxCoordinates.length
-
         setTempBoxDragOffset({
           x: imageX - centerX,
           y: imageY - centerY,
@@ -469,7 +500,6 @@ export function CanvasOverlay({
           // Check if mouse click is close to this vertex (in image coordinates)
           const distance = Math.sqrt(Math.pow(imageX - vx, 2) + Math.pow(imageY - vy, 2))
           const hitRadius = 10 / Math.min(scaleX, scaleY) // Adjust hit radius based on scale
-
           if (distance < hitRadius) {
             setDraggingVertexIndex(i)
             setDraggedBubble(selectedBubbleId ?? null)
@@ -488,13 +518,11 @@ export function CanvasOverlay({
         if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
           setDraggedBubble(bubble.bubble_id)
           setIsDraggingBubble(true) // New state for bubble dragging
-
           // Calculate offset from bubble center
           const centerX =
             bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
           const centerY =
             bubble.mask_coordinates.reduce((sum, point) => sum + point[1], 0) / bubble.mask_coordinates.length
-
           setDragOffset({
             x: imageX - centerX,
             y: imageY - centerY,
@@ -513,7 +541,6 @@ export function CanvasOverlay({
     const rect = canvas.getBoundingClientRect()
     const currentClientX = event.clientX
     const currentClientY = event.clientY
-
     const scaleX = image.naturalWidth / canvas.width
     const scaleY = image.naturalHeight / canvas.height
 
@@ -528,7 +555,6 @@ export function CanvasOverlay({
     ) {
       const dx = currentClientX - initialTempBoxMousePos.x
       const dy = currentClientY - initialTempBoxMousePos.y
-
       const deltaImageX = dx / (canvas.width / image.naturalWidth)
       const deltaImageY = dy / (canvas.height / image.naturalHeight)
 
@@ -537,6 +563,7 @@ export function CanvasOverlay({
         initialTempBoxVertexPos.x + deltaImageX,
         initialTempBoxVertexPos.y + deltaImageY,
       ]
+
       setTempBoxCoordinates(newTempBoxCoordinates)
       return
     }
@@ -544,7 +571,6 @@ export function CanvasOverlay({
     if (isDraggingTempBox && tempBoxCoordinates && tempBoxDragOffset && initialTempBoxPolygon) {
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
-
       const imageX = x * scaleX
       const imageY = y * scaleY
 
@@ -563,6 +589,7 @@ export function CanvasOverlay({
       const offsetY = newCenterY - currentInitialCenterY
 
       const newTempBoxCoordinates = initialTempBoxPolygon.map((point) => [point[0] + offsetX, point[1] + offsetY])
+
       setTempBoxCoordinates(newTempBoxCoordinates)
       return
     }
@@ -596,6 +623,7 @@ export function CanvasOverlay({
         minY = Math.min(minY, point[1])
         maxY = Math.max(maxY, point[1])
       }
+
       const newBoundingBox = [minX, minY, maxX, maxY]
 
       if (onBubbleUpdate) {
@@ -666,6 +694,7 @@ export function CanvasOverlay({
         onBubbleGeometrySave(pageId, bubble) // Pass the entire bubble object
       }
     }
+
     setIsDraggingBubble(false)
     setIsDraggingVertex(false)
     setDraggedBubble(null)
@@ -695,7 +724,6 @@ export function CanvasOverlay({
       setDraggingVertexIndex(null)
       setInitialMousePos(null)
       setInitialVertexPos(null)
-
       setIsResizingTempBox(false)
       setResizingTempBoxVertexIndex(null)
       setIsDraggingTempBox(false)
@@ -723,7 +751,6 @@ export function CanvasOverlay({
     // --- Handle Temporary Box Interactions (Editor Activation/Deactivation) ---
     if (tempBoxCoordinates) {
       const clickedInsideTempBox = isPointInPolygon([imageX, imageY], tempBoxCoordinates)
-
       if (clickedInsideTempBox) {
         if (event.detail === 2) {
           // Double-clicked inside temp box, activate its editor
@@ -742,7 +769,12 @@ export function CanvasOverlay({
               minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
               maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
             }
-            setTempBoxEditBounds({ x: minX, y: minY, width: maxX - minX, height: maxY - minY })
+            setTempBoxEditBounds({
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            })
           }
           return // Consume the event
         } else if (event.detail === 1 && isEditingTempBoxText) {
@@ -782,7 +814,6 @@ export function CanvasOverlay({
               maxX = Number.NEGATIVE_INFINITY,
               minY = Number.POSITIVE_INFINITY,
               maxY = Number.NEGATIVE_INFINITY
-
             for (const point of bubble.mask_coordinates) {
               minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
               maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
@@ -815,13 +846,14 @@ export function CanvasOverlay({
       // If it's on the existing temp box, the logic above will handle activating its editor.
       // If it's on an empty area, we create a new one.
       if (!tempBoxCoordinates || !isPointInPolygon([imageX, imageY], tempBoxCoordinates)) {
-        const size = 50 // Default box size
+        const size = 100 // Default box size (increased from 50 to 100)
         const defaultPolygon = [
           [imageX - size, imageY - size],
           [imageX + size, imageY - size],
           [imageX + size, imageY + size],
           [imageX - size, imageY + size],
         ]
+
         setTempBoxCoordinates(defaultPolygon)
         setTempBoxText("") // Initialize with empty text
         setTempBoxFontSize(16) // Reset to default font size
@@ -842,7 +874,12 @@ export function CanvasOverlay({
             minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
             maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
           }
-          setTempBoxEditBounds({ x: minX, y: minY, width: maxX - minX, height: maxY - minY })
+          setTempBoxEditBounds({
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          })
         }
         return
       }
@@ -874,8 +911,91 @@ export function CanvasOverlay({
   }
 
   // Handlers for temporary box text editing
-  const handleSaveTempBoxEdit = () => {
-    setIsEditingTempBoxText(false)
+  const handleSaveTempBoxEdit = async () => {
+    if (!tempBoxCoordinates || !tempBoxText.trim()) {
+      // If no text, just close the editor
+      setIsEditingTempBoxText(false)
+      return
+    }
+
+    setIsSavingTempBox(true)
+
+    try {
+      // Calculate bounding box from polygon coordinates
+      let minX = Number.POSITIVE_INFINITY,
+        maxX = Number.NEGATIVE_INFINITY,
+        minY = Number.POSITIVE_INFINITY,
+        maxY = Number.NEGATIVE_INFINITY
+
+      for (const point of tempBoxCoordinates) {
+        minX = Math.min(minX, point[0])
+        maxX = Math.max(maxX, point[0])
+        minY = Math.min(minY, point[1])
+        maxY = Math.max(maxY, point[1])
+      }
+
+      const coordinates_xyxy = [minX, minY, maxX, maxY]
+
+      // Generate bubble number (next in sequence)
+      const maxBubbleNo = speechBubbles.length > 0 ? Math.max(...speechBubbles.map((b) => b.bubble_no)) : 0
+      const bubble_no = maxBubbleNo + 1
+
+      // Prepare API data
+      const bubbleData = {
+        page_id: pageId,
+        bubble_no: bubble_no,
+        coordinates_xyxy: coordinates_xyxy,
+        mask_coordinates_xyxy: tempBoxCoordinates.map((coord) => [Math.round(coord[0]), Math.round(coord[1])]), // Convert to integers
+        text: tempBoxText,
+        translation: tempBoxText, // Use same text for translation initially
+        font_id: tempBoxFontId,
+        text_coordinates_xyxy: coordinates_xyxy, // Use same coordinates for text
+      }
+
+      // Call API to create speech bubble
+      const result = await createSpeechBubble(bubbleData)
+
+      console.log("Speech bubble created successfully:", result)
+
+      // Show success toast
+      toast({ title: "Success", description: "Bubble created successfully" })
+
+      // Create new bubble object for real-time update
+      const newBubble: SpeechBubble = {
+        bubble_id: result.bubble_id || Date.now(), // Use returned ID or fallback
+        bubble_no: bubble_no,
+        coordinates: coordinates_xyxy,
+        mask_coordinates: tempBoxCoordinates,
+        text: tempBoxText,
+        translation: tempBoxText,
+        font_size: tempBoxFontSize,
+        font_color: tempBoxFontColor,
+        font_id: tempBoxFontId,
+      }
+
+      // Add to speechBubbles array for real-time update
+      if (onBubbleUpdate) {
+        // If there's a callback to update bubbles, use it
+        speechBubbles.push(newBubble)
+      }
+
+      // Clear temporary box after successful save
+      setTempBoxCoordinates(null)
+      setTempBoxText("")
+      setTempBoxFontSize(16)
+      setTempBoxFontColor([0, 0, 0])
+      setTempBoxFontId(fonts[0]?.id || 1)
+      setIsEditingTempBoxText(false)
+    } catch (error) {
+      console.error("Failed to create speech bubble:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save speech bubble. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingTempBox(false)
+    }
   }
 
   const handleCancelTempBoxEdit = () => {
@@ -975,7 +1095,6 @@ export function CanvasOverlay({
     const exportCanvas = document.createElement("canvas")
     exportCanvas.width = image.naturalWidth // Use original image dimensions for export canvas
     exportCanvas.height = image.naturalHeight
-
     const ctx = exportCanvas.getContext("2d")
     if (!ctx) return null
 
@@ -1022,6 +1141,7 @@ export function CanvasOverlay({
       const rect = image.getBoundingClientRect()
       canvas.width = rect.width
       canvas.height = rect.height
+
       redrawCanvas()
     }
 
@@ -1179,7 +1299,7 @@ export function CanvasOverlay({
         >
           <div className="space-y-2">
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1">Temporary Text:</label>
+              <label className="text-xs font-medium text-gray-700 block mb-1">Bubble Text:</label>
               <textarea
                 value={tempBoxText}
                 onChange={(e) => setTempBoxText(e.target.value)}
@@ -1194,6 +1314,7 @@ export function CanvasOverlay({
                   }
                 }}
                 autoFocus
+                disabled={isSavingTempBox}
               />
             </div>
             <div className="flex items-center gap-4">
@@ -1204,6 +1325,7 @@ export function CanvasOverlay({
                   className="border rounded px-2 py-1 text-sm"
                   value={tempBoxFontSize}
                   onChange={(e) => setTempBoxFontSize(Number(e.target.value))}
+                  disabled={isSavingTempBox}
                 />
               </div>
               <div className="flex flex-col w-1/2">
@@ -1213,12 +1335,17 @@ export function CanvasOverlay({
                   className="h-9 rounded"
                   value={rgbArrayToHex(tempBoxFontColor)}
                   onChange={(e) => setTempBoxFontColor(hexToRgbArray(e.target.value))}
+                  disabled={isSavingTempBox}
                 />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-medium text-gray-700 block mb-1">Font Family</label>
-              <Select value={tempBoxFontId.toString()} onValueChange={(value) => setTempBoxFontId(Number(value))}>
+              <Select
+                value={tempBoxFontId.toString()}
+                onValueChange={(value) => setTempBoxFontId(Number(value))}
+                disabled={isSavingTempBox}
+              >
                 <SelectTrigger className="text-xs">
                   <SelectValue placeholder="Select font">
                     {fonts.find((f) => f.id === tempBoxFontId)?.name || "Select font"}
@@ -1239,13 +1366,15 @@ export function CanvasOverlay({
             <div className="flex gap-1">
               <button
                 onClick={handleSaveTempBoxEdit}
-                className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex-1"
+                className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSavingTempBox}
               >
-                Save (Ctrl+Enter)
+                {isSavingTempBox ? "Saving..." : "Save (Ctrl+Enter)"}
               </button>
               <button
                 onClick={handleCancelTempBoxEdit}
                 className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 flex-1"
+                disabled={isSavingTempBox}
               >
                 Cancel (Esc)
               </button>
