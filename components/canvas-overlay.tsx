@@ -1448,7 +1448,7 @@ export function CanvasOverlay({
 
       {!isAddingBubble && !editingBubble && !isEditingTempBoxText && (
         <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm instruction-overlay">
-          Double-click speech bubble to edit text • Double-click empty area to add/edit temporary box • Drag bubbles to
+          Double-click speech bubble to edit text • Double-click empty area to add/edit New box • Drag bubbles to
           move
         </div>
       )}
