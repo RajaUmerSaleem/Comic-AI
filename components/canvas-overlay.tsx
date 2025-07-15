@@ -146,6 +146,35 @@ export function CanvasOverlay({
     }
   }
 
+  // API function to update speech bubble
+  const updateSpeechBubble = async (
+    bubbleId: number,
+    updateData: {
+      coordinates_xyxy?: number[]
+      mask_coordinates_xyxy?: number[][]
+      text?: string
+      translation?: string
+      font_id?: number
+      text_coordinates_xyxy?: number[]
+    },
+  ) => {
+    try {
+      const result = await apiRequest(
+        `/v1/pages/bubble/${bubbleId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(updateData),
+        },
+        token ?? undefined,
+      )
+
+      return result
+    } catch (error) {
+      console.error("Error updating speech bubble:", error)
+      throw error
+    }
+  }
+
   const isPointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
     const [x, y] = point
     let inside = false
@@ -381,8 +410,9 @@ export function CanvasOverlay({
       ctx.fill()
     }
 
-    // Draw text if editing is not active (or if hiding UI for export)
-    if (!isEditingTempBoxText || hideUI) {
+    // Draw text for temporary box
+    // Always draw text for temporary box, even when editing, for real-time preview
+    if (boxText && boxText.trim()) {
       // Calculate bounds for text positioning
       let minX = Number.POSITIVE_INFINITY,
         maxX = Number.NEGATIVE_INFINITY,
@@ -681,29 +711,56 @@ export function CanvasOverlay({
     }
   }
 
-  const handleCanvasMouseUp = () => {
-    // Reset states for existing bubbles
+  const handleCanvasMouseUp = async () => {
+    let bubbleToSave: SpeechBubble | undefined = undefined
+    let bubbleIdToSave: number | null = null
+
     if (isDraggingVertex && draggedBubble) {
-      const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
-      if (bubble && onBubbleGeometrySave) {
-        onBubbleGeometrySave(pageId, bubble) // Pass the entire bubble object
-      }
+      bubbleToSave = speechBubbles.find((b) => b.bubble_id === draggedBubble)
+      bubbleIdToSave = draggedBubble
     } else if (isDraggingBubble && draggedBubble) {
-      const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
-      if (bubble && onBubbleGeometrySave) {
-        onBubbleGeometrySave(pageId, bubble) // Pass the entire bubble object
+      bubbleToSave = speechBubbles.find((b) => b.bubble_id === draggedBubble)
+      bubbleIdToSave = draggedBubble
+    }
+
+    if (bubbleToSave && bubbleIdToSave) {
+      try {
+        const updateData = {
+          coordinates_xyxy: bubbleToSave.coordinates.map((coord) => Number(coord)), // Convert to floats
+          mask_coordinates_xyxy: bubbleToSave.mask_coordinates.map((coord) => [
+            Math.round(coord[0]),
+            Math.round(coord[1]),
+          ]), // Convert to integers
+        }
+
+        await updateSpeechBubble(bubbleIdToSave, updateData)
+
+        toast({ title: "Success", description: "Bubble position updated successfully" })
+
+        // Only call this if the API update was successful
+        if (onBubbleGeometrySave) {
+          onBubbleGeometrySave(pageId, bubbleToSave)
+        }
+      } catch (error) {
+        console.error("Failed to update bubble position:", error)
+        toast({
+          title: "Error",
+          description: "Failed to update bubble position. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        // Reset states for existing bubbles after API call attempt
+        setIsDraggingBubble(false)
+        setIsDraggingVertex(false)
+        setDraggedBubble(null)
+        setDragOffset({ x: 0, y: 0 })
+        setDraggingVertexIndex(null)
+        setInitialMousePos(null)
+        setInitialVertexPos(null)
       }
     }
 
-    setIsDraggingBubble(false)
-    setIsDraggingVertex(false)
-    setDraggedBubble(null)
-    setDragOffset({ x: 0, y: 0 })
-    setDraggingVertexIndex(null)
-    setInitialMousePos(null)
-    setInitialVertexPos(null)
-
-    // Reset states for temporary box
+    // Reset states for temporary box (these are independent of bubble drag/resize save)
     setIsResizingTempBox(false)
     setResizingTempBoxVertexIndex(null)
     setIsDraggingTempBox(false)
@@ -1063,8 +1120,8 @@ export function CanvasOverlay({
       }
 
       // Draw temporary box if it exists
-      if (tempBoxCoordinates && !isEditingTempBoxText) {
-        // Only draw if not actively editing text
+      if (tempBoxCoordinates) {
+        // Always draw temp box, even when editing text, for real-time preview
         drawTempBox(
           ctx,
           tempBoxCoordinates,

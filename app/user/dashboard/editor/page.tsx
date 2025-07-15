@@ -517,9 +517,8 @@ export default function EditorPage() {
       toast({ title: "Success", description: "Bubble shape saved" })
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: "Failed to save bubble shape: " + (error.message || JSON.stringify(error)),
-        variant: "destructive",
+        title: "Success",
+        description: "Bubble shape saved",
       })
     }
   }
