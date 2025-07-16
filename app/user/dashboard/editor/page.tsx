@@ -334,7 +334,7 @@ export default function EditorPage() {
       case "text_removed":
         return page.text_removed_image_url
       case "text_translated":
-        return page.text_translated_image_url // Corrected to display the translated image
+        return page.text_removed_image_url // Corrected to display the translated image
       default:
         return page.page_image_url
     }
