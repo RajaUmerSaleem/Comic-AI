@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -88,14 +87,12 @@ export default function EditorPage() {
     const updateMostVisiblePage = () => {
       let maxRatio = 0
       let mostVisiblePageId: number | null = null
-
       for (const [pageId, ratio] of visibilityMap.entries()) {
         if (ratio > maxRatio) {
           maxRatio = ratio
           mostVisiblePageId = pageId
         }
       }
-
       if (mostVisiblePageId !== null) {
         setSelectedPageId(mostVisiblePageId)
       }
@@ -110,7 +107,6 @@ export default function EditorPage() {
           entries.forEach((entry) => {
             const pageIdAttr = entry.target.getAttribute("data-page-id")
             if (!pageIdAttr) return
-
             const pageId = Number(pageIdAttr)
             visibilityMap.set(pageId, entry.intersectionRatio)
             updateMostVisiblePage()
@@ -144,7 +140,6 @@ export default function EditorPage() {
         pollTaskStatus(taskId, key)
       })
     }, 3000)
-
     return () => clearInterval(interval)
   }, [processingTasks])
 
@@ -225,7 +220,6 @@ export default function EditorPage() {
 
   const startDetection = async (pageId?: number) => {
     if (!selectedFileId) return
-
     if (!token) {
       toast({
         title: "Authentication Error",
@@ -234,17 +228,13 @@ export default function EditorPage() {
       })
       return
     }
-
     try {
       const url = pageId
         ? `/v1/file/async-detect?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-detect?file_id=${selectedFileId}`
-
       const response = await apiRequest(url, { method: "POST" }, token)
-
       const taskKey = pageId ? `detect-${pageId}` : `detect-${selectedFileId}`
       addTask(taskKey, response.task_id)
-
       toast({
         title: "Detection Started",
         description: "Detecting speech bubbles...",
@@ -260,7 +250,6 @@ export default function EditorPage() {
 
   const startTextRemoval = async (pageId?: number) => {
     if (!selectedFileId) return
-
     if (!token) {
       toast({
         title: "Authentication Error",
@@ -269,17 +258,13 @@ export default function EditorPage() {
       })
       return
     }
-
     try {
       const url = pageId
         ? `/v1/file/async-remove-text?file_id=${selectedFileId}&page_id=${pageId}`
         : `/v1/file/async-remove-text?file_id=${selectedFileId}`
-
       const response = await apiRequest(url, { method: "POST" }, token)
-
       const taskKey = pageId ? `remove-${pageId}` : `remove-${selectedFileId}`
       addTask(taskKey, response.task_id)
-
       toast({
         title: "Text Removal Started",
         description: "Removing text from speech bubbles...",
@@ -301,10 +286,8 @@ export default function EditorPage() {
     }
     try {
       const response = await apiRequest(`/v1/file/task-status/${taskId}`, {}, token)
-
       if (response.status === "SUCCESS" || response.status === "FAILED") {
         removeTask(taskKey)
-
         if (response.status === "SUCCESS") {
           toast({
             title: "Success",
@@ -334,7 +317,7 @@ export default function EditorPage() {
       case "text_removed":
         return page.text_removed_image_url
       case "text_translated":
-        return page.text_removed_image_url // Corrected to display the translated image
+        return page.text_removed_image_url // Corrected to display the removed image in translated tab it also show removed images
       default:
         return page.page_image_url
     }
@@ -353,9 +336,15 @@ export default function EditorPage() {
     // The sidebar will handle the actual bubble creation
   }
 
-  const handleBubbleTextUpdate = async (bubbleId: number, text: string, translation: string) => {
+  const handleBubbleTextUpdate = async (
+    bubbleId: number,
+    text: string,
+    translation: string,
+    font_size?: number | null,
+    font_color?: number[] | null,
+    font_id?: number | null,
+  ) => {
     if (!selectedPageId) return
-
     if (!token) {
       toast({
         title: "Authentication Error",
@@ -364,8 +353,16 @@ export default function EditorPage() {
       })
       return
     }
-
     try {
+      // Find the current bubble to retain other properties
+      const currentPage = pages.find((p) => p.page_id === selectedPageId)
+      const currentBubble = currentPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
+
+      if (!currentBubble) {
+        toast({ title: "Error", description: "Bubble not found for update.", variant: "destructive" })
+        return
+      }
+
       // Update text
       await apiRequest(
         `/v1/pages/${selectedPageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
@@ -373,7 +370,7 @@ export default function EditorPage() {
         token,
       )
 
-      // Update translation
+      // Update translation and font properties
       await apiRequest(
         `/v1/pages/${selectedPageId}/bubble/${bubbleId}/translation`,
         {
@@ -384,6 +381,9 @@ export default function EditorPage() {
               {
                 bubble_id: bubbleId,
                 translation,
+                font_size: font_size ?? currentBubble.font_size, // Use provided or current
+                font_color: font_color ?? currentBubble.font_color, // Use provided or current
+                font_id: font_id ?? currentBubble.font_id, // Use provided or current
               },
             ],
           }),
@@ -392,7 +392,6 @@ export default function EditorPage() {
       )
 
       toast({ title: "Success", description: "Bubble updated successfully" })
-
       // Refresh pages
       if (selectedFileId) {
         fetchPages(selectedFileId)
@@ -409,7 +408,6 @@ export default function EditorPage() {
   // New function to handle double-click bubble creation
   const handleCanvasDoubleClick = async (coordinates: number[][]) => {
     if (!selectedPageId) return
-
     if (!token) {
       toast({
         title: "Authentication Error",
@@ -418,7 +416,6 @@ export default function EditorPage() {
       })
       return
     }
-
     try {
       let minX = Number.POSITIVE_INFINITY,
         maxX = Number.NEGATIVE_INFINITY,
@@ -458,7 +455,6 @@ export default function EditorPage() {
         title: "Success",
         description: "Speech bubble created successfully",
       })
-
       if (selectedFileId) {
         fetchPages(selectedFileId)
       }
@@ -557,7 +553,6 @@ export default function EditorPage() {
         <h1 className="text-3xl font-bold tracking-tight">Comic Editor</h1>
         <p className="text-muted-foreground">Edit speech bubbles and add translations to your comics.</p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Select File</CardTitle>
@@ -581,7 +576,6 @@ export default function EditorPage() {
           </Select>
         </CardContent>
       </Card>
-
       {selectedFileId && pages.length > 0 && (
         <div
           className={`${
@@ -656,7 +650,6 @@ export default function EditorPage() {
                               </div>
                             </div>
                           </div>
-
                           <div
                             className="flex-1 overflow-y-auto snap-y snap-mandatory px-4 py-2"
                             style={{ scrollBehavior: "auto" }}
@@ -716,7 +709,6 @@ export default function EditorPage() {
               </CardContent>
             </Card>
           </div>
-
           <div className="lg:col-span-1">
             <div className="h-full border rounded-xl">
               <Tabs defaultValue="editor" className="w-full">
@@ -739,7 +731,7 @@ export default function EditorPage() {
                     onPolygonSelect={handlePolygonSelect}
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
-                    onBubbleClick={handleBubbleClick} 
+                    onBubbleClick={handleBubbleClick}
                   />
                 </TabsContent>
                 <TabsContent value="bubbles">
@@ -765,7 +757,6 @@ export default function EditorPage() {
           </div>
         </div>
       )}
-
       {selectedFileId && pages.length === 0 && (
         <Card>
           <CardContent className="text-center py-8">
