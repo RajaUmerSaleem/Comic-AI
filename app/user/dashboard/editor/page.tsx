@@ -317,7 +317,7 @@ export default function EditorPage() {
       case "text_removed":
         return page.text_removed_image_url
       case "text_translated":
-        return page.text_removed_image_url // Corrected to display the removed image in translated tab it also show removed images
+        return page.text_translated_image_url || page.text_removed_image_url
       default:
         return page.page_image_url
     }
@@ -636,7 +636,9 @@ export default function EditorPage() {
                                     </TabsTrigger>
                                     <TabsTrigger
                                       value="text_translated"
-                                      disabled={!pages.every((p) => !!p.text_translated_image_url)}
+                                      disabled={
+                                        !pages.every((p) => !!p.text_translated_image_url || !!p.text_removed_image_url)
+                                      }
                                     >
                                       Translate
                                     </TabsTrigger>
