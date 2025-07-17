@@ -637,7 +637,7 @@ export default function EditorPage() {
                                     <TabsTrigger
                                       value="text_translated"
                                       disabled={
-                                        !pages.every((p) => !!p.text_translated_image_url || !!p.text_removed_image_url)
+                                        !pages.every((p) => !!p.text_removed_image_url)
                                       }
                                     >
                                       Translate
