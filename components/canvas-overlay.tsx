@@ -1,4 +1,5 @@
 "use client"
+
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
@@ -6,6 +7,30 @@ import { hexToRgbArray, rgbArrayToHex } from "@/lib/utilsss" // Import from util
 import { apiRequest } from "@/lib/api"
 import { useAuth } from "./auth-provider"
 import { toast } from "@/hooks/use-toast"
+
+// Helper for deep comparison of number arrays
+function arraysEqual(a: number[], b: number[]): boolean {
+  if (a === b) return true // Same reference
+  if (a == null || b == null) return false // One is null/undefined
+  if (a.length !== b.length) return false
+
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+// Helper for deep comparison of 2D number arrays
+function arraysOfArraysEqual(a: number[][], b: number[][]): boolean {
+  if (a === b) return true // Same reference
+  if (a == null || b == null) return false // One is null/undefined
+  if (a.length !== b.length) return false
+
+  for (let i = 0; i < a.length; i++) {
+    if (!arraysEqual(a[i], b[i])) return false
+  }
+  return true
+}
 
 interface SpeechBubble {
   bubble_id: number
@@ -70,10 +95,8 @@ export function CanvasOverlay({
     width: 0,
     height: 0,
   })
-  const [draggedBubble, setDraggedBubble] = useState<number | null>(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const [isDraggingBubble, setIsDraggingBubble] = useState(false)
-  const [isDraggingVertex, setIsDraggingVertex] = useState(false)
+
+  // States for drag/resize of existing bubbles
   const { token } = useAuth()
   const [draggingVertexIndex, setDraggingVertexIndex] = useState<number | null>(null)
   const [initialMousePos, setInitialMousePos] = useState<{
@@ -84,6 +107,10 @@ export function CanvasOverlay({
     x: number
     y: number
   } | null>(null)
+  const [draggedBubble, setDraggedBubble] = useState<number | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [initialBubbleState, setInitialBubbleState] = useState<SpeechBubble | null>(null) // Store initial state for comparison
+
   // New states for temporary box
   const [tempBoxCoordinates, setTempBoxCoordinates] = useState<number[][] | null>(null)
   const [isResizingTempBox, setIsResizingTempBox] = useState(false)
@@ -107,12 +134,19 @@ export function CanvasOverlay({
     y: number
   } | null>(null)
   const [initialTempBoxPolygon, setInitialTempBoxPolygon] = useState<number[][] | null>(null)
+
   // New states for temporary box font properties
   const [tempBoxFontSize, setTempBoxFontSize] = useState<number>(16)
   const [tempBoxFontColor, setTempBoxFontColor] = useState<number[]>([0, 0, 0]) // Default black
   const [tempBoxFontId, setTempBoxFontId] = useState<number>(fonts[0]?.id || 1) // Default to first font or 1
+
   // Loading state for API call
   const [isSavingTempBox, setIsSavingTempBox] = useState(false)
+
+  // New states for click vs. drag detection
+  const [mouseDownClientPos, setMouseDownClientPos] = useState<{ x: number; y: number } | null>(null)
+  const [isPotentialDrag, setIsPotentialDrag] = useState(false) // True if mouse down on a draggable element
+  const CLICK_THRESHOLD = 5 // Pixels
 
   useEffect(() => {
     if (fonts.length > 0 && tempBoxFontId === 1) {
@@ -186,7 +220,6 @@ export function CanvasOverlay({
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       const [xi, yi] = polygon[i]
       const [xj, yj] = polygon[j]
-
       if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
         inside = !inside
       }
@@ -214,7 +247,6 @@ export function CanvasOverlay({
       maxX = Number.NEGATIVE_INFINITY,
       minY = Number.POSITIVE_INFINITY,
       maxY = Number.NEGATIVE_INFINITY
-
     for (const point of bubble.mask_coordinates) {
       minX = Math.min(minX, point[0] * scaleX)
       maxX = Math.max(maxX, point[0] * scaleX)
@@ -255,7 +287,6 @@ export function CanvasOverlay({
           ctx.fill()
         })
       }
-
       // Fill polygon with semi-transparent background
       ctx.fillStyle = isSelected
         ? "rgba(239, 68, 68, 0.1)"
@@ -295,6 +326,7 @@ export function CanvasOverlay({
       // Set font properties - APPLY FONT CHANGES IMMEDIATELY
       // Fix 1: Removed aggressive clamping from font size calculation.
       const fontSize = (bubble.font_size || 14) * Math.min(scaleX, scaleY)
+
       // Apply font family if font_id is available - USE FONTS PROP
       let fontFamily = "Arial" // Default fallback
       if (bubble.font_id && fonts) {
@@ -318,11 +350,9 @@ export function CanvasOverlay({
       const words = textToShow.split(/\s+/)
       const lines: string[] = []
       let currentLine = ""
-
       for (const word of words) {
         const testLine = currentLine + (currentLine ? " " : "") + word
         const metrics = ctx.measureText(testLine)
-
         if (metrics.width > maxWidth && currentLine) {
           lines.push(currentLine)
           currentLine = word
@@ -421,7 +451,6 @@ export function CanvasOverlay({
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
         maxY = Number.NEGATIVE_INFINITY
-
       for (const point of coordinates) {
         minX = Math.min(minX, point[0] * scaleX)
         maxX = Math.max(maxX, point[0] * scaleX)
@@ -450,11 +479,9 @@ export function CanvasOverlay({
       const words = boxText.split(/\s+/)
       const lines: string[] = []
       let currentLine = ""
-
       for (const word of words) {
         const testLine = currentLine + (currentLine ? " " : "") + word
         const metrics = ctx.measureText(testLine)
-
         if (metrics.width > maxWidth && currentLine) {
           lines.push(currentLine)
           currentLine = word
@@ -480,11 +507,11 @@ export function CanvasOverlay({
     const image = imageRef.current
     if (!canvas || !image) return
 
+    setMouseDownClientPos({ x: event.clientX, y: event.clientY }) // Record mouse down position
+
     const rect = canvas.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
-
-    // Convert to image coordinates
     const scaleX = image.naturalWidth / canvas.width
     const scaleY = image.naturalHeight / canvas.height
     const imageX = x * scaleX
@@ -500,16 +527,17 @@ export function CanvasOverlay({
         if (distance < hitRadius) {
           setResizingTempBoxVertexIndex(i)
           setIsResizingTempBox(true)
+          setIsPotentialDrag(true) // Mark as potential drag
           setInitialTempBoxMousePos({ x: event.clientX, y: event.clientY })
           setInitialTempBoxVertexPos({ x: vx, y: vy })
           setInitialTempBoxPolygon([...tempBoxCoordinates]) // Store initial polygon for relative movement
           return // Stop further processing
         }
       }
-
       // Check if clicking inside the temporary box for dragging
       if (isPointInPolygon([imageX, imageY], tempBoxCoordinates)) {
         setIsDraggingTempBox(true)
+        setIsPotentialDrag(true) // Mark as potential drag
         // Calculate offset from box center
         const centerX = tempBoxCoordinates.reduce((sum, point) => sum + point[0], 0) / tempBoxCoordinates.length
         const centerY = tempBoxCoordinates.reduce((sum, point) => sum + point[1], 0) / tempBoxCoordinates.length
@@ -535,9 +563,10 @@ export function CanvasOverlay({
           if (distance < hitRadius) {
             setDraggingVertexIndex(i)
             setDraggedBubble(selectedBubbleId ?? null)
+            setIsPotentialDrag(true) // Mark as potential drag
             setInitialMousePos({ x: event.clientX, y: event.clientY })
             setInitialVertexPos({ x: vx, y: vy })
-            setIsDraggingVertex(true) // New state for vertex dragging
+            setInitialBubbleState({ ...selectedBubble }) // Store initial state for comparison
             return // Stop further processing, we're dragging a vertex
           }
         }
@@ -549,7 +578,8 @@ export function CanvasOverlay({
       if (bubble.mask_coordinates && bubble.mask_coordinates.length > 0) {
         if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
           setDraggedBubble(bubble.bubble_id)
-          setIsDraggingBubble(true) // New state for bubble dragging
+          setIsPotentialDrag(true) // Mark as potential drag
+          setInitialBubbleState({ ...bubble }) // Store initial state for comparison
           // Calculate offset from bubble center
           const centerX =
             bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
@@ -573,13 +603,24 @@ export function CanvasOverlay({
     const rect = canvas.getBoundingClientRect()
     const currentClientX = event.clientX
     const currentClientY = event.clientY
-
     const scaleX = image.naturalWidth / canvas.width
     const scaleY = image.naturalHeight / canvas.height
+
+    // Determine if a drag has actually started (moved beyond threshold)
+    let actualDragStarted = false
+    if (mouseDownClientPos && isPotentialDrag) {
+      const distanceMoved = Math.sqrt(
+        Math.pow(currentClientX - mouseDownClientPos.x, 2) + Math.pow(currentClientY - mouseDownClientPos.y, 2),
+      )
+      if (distanceMoved >= CLICK_THRESHOLD) {
+        actualDragStarted = true
+      }
+    }
 
     // --- Handle Temporary Box Interactions ---
     if (
       isResizingTempBox &&
+      actualDragStarted &&
       tempBoxCoordinates &&
       resizingTempBoxVertexIndex !== null &&
       initialTempBoxMousePos &&
@@ -588,10 +629,8 @@ export function CanvasOverlay({
     ) {
       const dx = currentClientX - initialTempBoxMousePos.x
       const dy = currentClientY - initialTempBoxMousePos.y
-
       const deltaImageX = dx / (canvas.width / image.naturalWidth)
       const deltaImageY = dy / (canvas.height / image.naturalHeight)
-
       const newTempBoxCoordinates = [...initialTempBoxPolygon]
       newTempBoxCoordinates[resizingTempBoxVertexIndex] = [
         initialTempBoxVertexPos.x + deltaImageX,
@@ -601,10 +640,9 @@ export function CanvasOverlay({
       return
     }
 
-    if (isDraggingTempBox && tempBoxCoordinates && tempBoxDragOffset && initialTempBoxPolygon) {
+    if (isDraggingTempBox && actualDragStarted && tempBoxCoordinates && tempBoxDragOffset && initialTempBoxPolygon) {
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
-
       const imageX = x * scaleX
       const imageY = y * scaleY
 
@@ -628,7 +666,7 @@ export function CanvasOverlay({
     }
 
     // --- Handle Existing Bubble Interactions ---
-    if (isDraggingVertex && draggedBubble && draggingVertexIndex !== null) {
+    if (draggedBubble && draggingVertexIndex !== null && actualDragStarted) {
       if (!initialMousePos || !initialVertexPos) return
 
       const dx = currentClientX - initialMousePos.x
@@ -649,7 +687,6 @@ export function CanvasOverlay({
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
         maxY = Number.NEGATIVE_INFINITY
-
       for (const point of newMaskCoordinates) {
         minX = Math.min(minX, point[0])
         maxX = Math.max(maxX, point[0])
@@ -667,214 +704,179 @@ export function CanvasOverlay({
       return // Stop further processing, we're dragging a vertex
     }
 
-    if (!isDraggingBubble || !draggedBubble) return
+    if (draggedBubble && actualDragStarted) {
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
 
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+      // Convert to image coordinates
+      const imageX = x * scaleX
+      const imageY = y * scaleY
 
-    // Convert to image coordinates
-    const imageX = x * scaleX
-    const imageY = y * scaleY
+      // Find the bubble being dragged
+      const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
+      if (!bubble) return
 
-    // Find the bubble being dragged
-    const bubble = speechBubbles.find((b) => b.bubble_id === draggedBubble)
-    if (!bubble) return
+      // Calculate new center position
+      const newCenterX = imageX - dragOffset.x
+      const newCenterY = imageY - dragOffset.y
 
-    // Calculate new center position
-    const newCenterX = imageX - dragOffset.x
-    const newCenterY = imageY - dragOffset.y
+      // Calculate current center
+      const currentCenterX =
+        bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
+      const currentCenterY =
+        bubble.mask_coordinates.reduce((sum, point) => sum + point[1], 0) / bubble.mask_coordinates.length
 
-    // Calculate current center
-    const currentCenterX =
-      bubble.mask_coordinates.reduce((sum, point) => sum + point[0], 0) / bubble.mask_coordinates.length
-    const currentCenterY =
-      bubble.mask_coordinates.reduce((sum, point) => sum + point[1], 0) / bubble.mask_coordinates.length
+      // Calculate offset to apply to all points
+      const offsetX = newCenterX - currentCenterX
+      const offsetY = newCenterY - currentCenterY
 
-    // Calculate offset to apply to all points
-    const offsetX = newCenterX - currentCenterX
-    const offsetY = newCenterY - currentCenterY
+      // Update bubble coordinates locally for real-time preview
+      const newMaskCoordinates = bubble.mask_coordinates.map((point) => [point[0] + offsetX, point[1] + offsetY])
+      const newBoundingBox = [
+        bubble.coordinates[0] + offsetX,
+        bubble.coordinates[1] + offsetY,
+        bubble.coordinates[2] + offsetX,
+        bubble.coordinates[3] + offsetY,
+      ]
 
-    // Update bubble coordinates locally for real-time preview
-    const newMaskCoordinates = bubble.mask_coordinates.map((point) => [point[0] + offsetX, point[1] + offsetY])
-    const newBoundingBox = [
-      bubble.coordinates[0] + offsetX,
-      bubble.coordinates[1] + offsetY,
-      bubble.coordinates[2] + offsetX,
-      bubble.coordinates[3] + offsetY,
-    ]
-
-    // Update local state for real-time preview
-    if (onBubbleUpdate) {
-      onBubbleUpdate(pageId, draggedBubble, {
-        mask_coordinates: newMaskCoordinates,
-        coordinates: newBoundingBox,
-      })
-    }
-  }
-
-  const handleCanvasMouseUp = async () => {
-    let bubbleToSave: SpeechBubble | undefined = undefined
-    let bubbleIdToSave: number | null = null
-
-    if (isDraggingVertex && draggedBubble) {
-      bubbleToSave = speechBubbles.find((b) => b.bubble_id === draggedBubble)
-      bubbleIdToSave = draggedBubble
-    } else if (isDraggingBubble && draggedBubble) {
-      bubbleToSave = speechBubbles.find((b) => b.bubble_id === draggedBubble)
-      bubbleIdToSave = draggedBubble
-    }
-
-    if (bubbleToSave && bubbleIdToSave) {
-      try {
-        const updateData = {
-          coordinates_xyxy: bubbleToSave.coordinates.map((coord) => Number(coord)), // Convert to floats
-          mask_coordinates_xyxy: bubbleToSave.mask_coordinates.map((coord) => [
-            Math.round(coord[0]),
-            Math.round(coord[1]),
-          ]), // Convert to integers
-          // Fix 6: Ensure font properties are sent when saving geometry
-          font_size: bubbleToSave.font_size ?? undefined, // Convert null to undefined
-          font_color: bubbleToSave.font_color ?? undefined, // Convert null to undefined
-          font_id: bubbleToSave.font_id ?? undefined, // Convert null to undefined
-        }
-        await updateSpeechBubble(bubbleIdToSave, updateData)
-        toast({ title: "Success", description: "Bubble position updated successfully" })
-        // Only call this if the API update was successful
-        if (onBubbleGeometrySave) {
-          onBubbleGeometrySave(pageId, bubbleToSave)
-        }
-      } catch (error) {
-        console.error("Failed to update bubble position:", error)
-        toast({
-          title: "Error",
-          description: "Failed to update bubble position. Please try again.",
-          variant: "destructive",
+      // Update local state for real-time preview
+      if (onBubbleUpdate) {
+        onBubbleUpdate(pageId, draggedBubble, {
+          mask_coordinates: newMaskCoordinates,
+          coordinates: newBoundingBox,
         })
-      } finally {
-        // Reset states for existing bubbles after API call attempt
-        setIsDraggingBubble(false)
-        setIsDraggingVertex(false)
-        setDraggedBubble(null)
-        setDragOffset({ x: 0, y: 0 })
-        setDraggingVertexIndex(null)
-        setInitialMousePos(null)
-        setInitialVertexPos(null)
       }
     }
-    // Reset states for temporary box (these are independent of bubble drag/resize save)
-    setIsResizingTempBox(false)
-    setResizingTempBoxVertexIndex(null)
-    setIsDraggingTempBox(false)
-    setTempBoxDragOffset({ x: 0, y: 0 })
-    setInitialTempBoxMousePos(null)
-    setInitialTempBoxVertexPos(null)
-    setInitialTempBoxPolygon(null)
   }
 
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    // Don't handle click if we were dragging/resizing (either bubble or temp box)
-    if (isDraggingBubble || isDraggingVertex || isResizingTempBox || isDraggingTempBox) {
-      // Reset dragging states if they weren't reset by mouseUp (e.g., mouseUp outside canvas)
-      setIsDraggingBubble(false)
-      setIsDraggingVertex(false)
-      setDraggedBubble(null)
-      setDragOffset({ x: 0, y: 0 })
-      setDraggingVertexIndex(null)
-      setInitialMousePos(null)
-      setInitialVertexPos(null)
-      setIsResizingTempBox(false)
-      setResizingTempBoxVertexIndex(null)
-      setIsDraggingTempBox(false)
-      setTempBoxDragOffset({ x: 0, y: 0 })
-      setInitialTempBoxMousePos(null)
-      setInitialTempBoxVertexPos(null)
-      setInitialTempBoxPolygon(null)
-      return
-    }
-
+  const handleCanvasMouseUp = async (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     const image = imageRef.current
-    if (!canvas || !image) return
+    if (!canvas || !image || !mouseDownClientPos) return
 
-    const rect = canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+    const distanceMoved = Math.sqrt(
+      Math.pow(event.clientX - mouseDownClientPos.x, 2) + Math.pow(event.clientY - mouseDownClientPos.y, 2),
+    )
 
-    // Convert to image coordinates
-    const scaleX = image.naturalWidth / canvas.width
-    const scaleY = image.naturalHeight / canvas.height
-    const imageX = x * scaleX
-    const imageY = y * scaleY
+    // Reset all potential drag states
+    setMouseDownClientPos(null)
+    setIsPotentialDrag(false)
 
-    // --- Handle Temporary Box Interactions (Editor Activation/Deactivation) ---
-    if (tempBoxCoordinates) {
-      const clickedInsideTempBox = isPointInPolygon([imageX, imageY], tempBoxCoordinates)
-      if (clickedInsideTempBox) {
-        if (event.detail === 2) {
-          // Double-clicked inside temp box, activate its editor
-          setIsEditingTempBoxText(true)
-          // Recalculate bounds for the editor based on current tempBoxCoordinates
-          const canvas = canvasRef.current
-          const image = imageRef.current
-          if (canvas && image) {
-            let minX = Number.POSITIVE_INFINITY,
-              maxX = Number.NEGATIVE_INFINITY,
-              minY = Number.POSITIVE_INFINITY,
-              maxY = Number.NEGATIVE_INFINITY
+    // If it was a drag (moved beyond threshold)
+    if (distanceMoved >= CLICK_THRESHOLD) {
+      let bubbleToSave: SpeechBubble | undefined = undefined
+      let bubbleIdToSave: number | null = null
 
-            for (const point of tempBoxCoordinates) {
-              minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
-              maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
-              minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
-              maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
+      if (draggedBubble) {
+        // This means a drag was initiated on an existing bubble/vertex
+        bubbleToSave = speechBubbles.find((b) => b.bubble_id === draggedBubble)
+        bubbleIdToSave = draggedBubble
+      }
+
+      if (bubbleToSave && bubbleIdToSave && initialBubbleState) {
+        // Check if coordinates or mask_coordinates have actually changed
+        const coordsChanged = !arraysEqual(bubbleToSave.coordinates, initialBubbleState.coordinates)
+        const maskCoordsChanged = !arraysOfArraysEqual(
+          bubbleToSave.mask_coordinates,
+          initialBubbleState.mask_coordinates,
+        )
+
+        if (coordsChanged || maskCoordsChanged) {
+          try {
+            const updateData = {
+              coordinates_xyxy: bubbleToSave.coordinates.map((coord) => Number(coord)), // Convert to floats
+              mask_coordinates_xyxy: bubbleToSave.mask_coordinates.map((coord) => [
+                Math.round(coord[0]),
+                Math.round(coord[1]),
+              ]), // Convert to integers
+              // Fix 6: Ensure font properties are sent when saving geometry
+              font_size: bubbleToSave.font_size ?? undefined, // Convert null to undefined
+              font_color: bubbleToSave.font_color ?? undefined, // Convert null to undefined
+              font_id: bubbleToSave.font_id ?? undefined, // Convert null to undefined
             }
-            setTempBoxEditBounds({
-              x: minX,
-              y: minY,
-              width: maxX - minX,
-              height: maxY - minY,
+            await updateSpeechBubble(bubbleIdToSave, updateData)
+            toast({ title: "Success", description: "Bubble position updated successfully" })
+            if (onBubbleGeometrySave) {
+              onBubbleGeometrySave(pageId, bubbleToSave)
+            }
+          } catch (error) {
+            console.error("Failed to update bubble position:", error)
+            toast({
+              title: "Error",
+              description: "Failed to update bubble position. Please try again.",
+              variant: "destructive",
             })
           }
-          return // Consume the event
-        } else if (event.detail === 1 && isEditingTempBoxText) {
-          // Single-clicked inside temp box while editor is active, dismiss editor
-          setIsEditingTempBoxText(false)
-          return // Consume the event
+        } else {
+          // No change in geometry, no API call needed
+          toast({ title: "Info", description: "No change in bubble position detected." })
         }
-        // If single click inside and editor is not active, do nothing (box remains selected/active)
-      } else {
-        // Clicked outside the temporary box
-        // Per user request, DO NOT DISMISS THE BOX.
-        // However, if the editor was active, it should dismiss.
-        if (isEditingTempBoxText) {
-          setIsEditingTempBoxText(false)
-        }
-        // Do not return here, allow other bubble interactions if applicable
       }
-    }
+    } else {
+      // It was a click (distanceMoved < CLICK_THRESHOLD)
+      // Re-run the click logic here
+      const rect = canvas.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      const scaleX = image.naturalWidth / canvas.width
+      const scaleY = image.naturalHeight / canvas.height
+      const imageX = x * scaleX
+      const imageY = y * scaleY
 
-    // --- Handle Polygon Drawing for Actual Bubble Creation ---
-    if (isAddingBubble) {
-      // Add point to polygon
-      const newPoints = [...polygonPoints, [imageX, imageY]]
-      setPolygonPoints(newPoints)
-      return
-    }
+      // --- Handle Temporary Box Interactions (Editor Activation/Deactivation) ---
+      if (tempBoxCoordinates) {
+        const clickedInsideTempBox = isPointInPolygon([imageX, imageY], tempBoxCoordinates)
+        if (clickedInsideTempBox) {
+          // Single-clicked inside temp box, activate its editor
+          setIsEditingTempBoxText(true)
+          // Recalculate bounds for the editor based on current tempBoxCoordinates
+          let minX = Number.POSITIVE_INFINITY,
+            maxX = Number.NEGATIVE_INFINITY,
+            minY = Number.POSITIVE_INFINITY,
+            maxY = Number.NEGATIVE_INFINITY
+          for (const point of tempBoxCoordinates) {
+            minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
+            maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
+            minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
+            maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
+          }
+          setTempBoxEditBounds({
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          })
+          // No return here, allow other bubble interactions if applicable (though unlikely for temp box)
+        } else {
+          // Clicked outside the temporary box
+          if (isEditingTempBoxText) {
+            setIsEditingTempBoxText(false)
+          }
+        }
+      }
 
-    // --- Handle Existing Bubble Selection / Editing ---
-    // Check if click is inside any existing bubble
-    for (const bubble of speechBubbles) {
-      if (bubble.mask_coordinates && bubble.mask_coordinates.length > 0) {
-        if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
-          // Fix 2: Double click to edit should show text and translation fields.
-          // This logic already exists, ensuring it's not bypassed by drag states.
-          if (event.detail === 2) {
-            // Calculate polygon bounds for positioning edit fields
+      // --- Handle Polygon Drawing for Actual Bubble Creation ---
+      if (isAddingBubble) {
+        // Add point to polygon
+        const newPoints = [...polygonPoints, [imageX, imageY]]
+        setPolygonPoints(newPoints)
+        // No return here, allow other bubble interactions if applicable
+      }
+
+      // --- Handle Existing Bubble Selection / Editing ---
+      // Check if click is inside any existing bubble
+      let clickedOnExistingBubble = false
+      for (const bubble of speechBubbles) {
+        if (bubble.mask_coordinates && bubble.mask_coordinates.length > 0) {
+          if (isPointInPolygon([imageX, imageY], bubble.mask_coordinates)) {
+            clickedOnExistingBubble = true
+            // Select bubble on single click
+            onBubbleClick?.(bubble)
+            // Make it editable
             let minX = Number.POSITIVE_INFINITY,
               maxX = Number.NEGATIVE_INFINITY,
               minY = Number.POSITIVE_INFINITY,
               maxY = Number.NEGATIVE_INFINITY
-
             for (const point of bubble.mask_coordinates) {
               minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
               maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
@@ -890,60 +892,71 @@ export function CanvasOverlay({
               width: maxX - minX,
               height: maxY - minY,
             })
-          } else {
-            onBubbleClick?.(bubble) // Select bubble on single click
+            break // Found and processed the clicked bubble, stop
           }
-          return
+        }
+      }
+
+      // If clicked on empty area and not adding bubble, and no existing bubble was clicked,
+      // then handle new temporary box creation.
+      if (!clickedOnExistingBubble && !isAddingBubble && event.detail === 2) {
+        // If we reach here, it means it's a double-click on an empty area or on the existing temp box itself.
+        // If it's on the existing temp box, the logic above will handle activating its editor.
+        // If it's on an empty area, we create a new one.
+        if (!tempBoxCoordinates || !isPointInPolygon([imageX, imageY], tempBoxCoordinates)) {
+          const size = 100 // Default box size (increased from 50 to 100)
+          const defaultPolygon = [
+            [imageX - size, imageY - size],
+            [imageX + size, imageY - size],
+            [imageX + size, imageY + size],
+            [imageX - size, imageY + size],
+          ]
+          setTempBoxCoordinates(defaultPolygon)
+          setTempBoxText("") // Initialize with empty text
+          setTempBoxFontSize(16) // Reset to default font size
+          setTempBoxFontColor([0, 0, 0]) // Reset to default font color (black)
+          setTempBoxFontId(fonts[0]?.id || 1) // Reset to default font ID
+          setIsEditingTempBoxText(true)
+          const canvas = canvasRef.current
+          const image = imageRef.current
+          if (canvas && image) {
+            let minX = Number.POSITIVE_INFINITY,
+              maxX = Number.NEGATIVE_INFINITY,
+              minY = Number.POSITIVE_INFINITY,
+              maxY = Number.NEGATIVE_INFINITY
+            for (const point of defaultPolygon) {
+              minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
+              maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
+              minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
+              maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
+            }
+            setTempBoxEditBounds({
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            })
+          }
         }
       }
     }
 
-    // --- Create New Temporary Box on Double-Click Empty Area ---
-    // If a temporary box exists, and we double-click outside it, replace it.
-    // If no temporary box exists, create a new one.
-    if (event.detail === 2 && !isAddingBubble) {
-      // If we reach here, it means it's a double-click on an empty area or on the existing temp box itself.
-      // If it's on the existing temp box, the logic above will handle activating its editor.
-      // If it's on an empty area, we create a new one.
-      if (!tempBoxCoordinates || !isPointInPolygon([imageX, imageY], tempBoxCoordinates)) {
-        const size = 100 // Default box size (increased from 50 to 100)
-        const defaultPolygon = [
-          [imageX - size, imageY - size],
-          [imageX + size, imageY - size],
-          [imageX + size, imageY + size],
-          [imageX - size, imageY + size],
-        ]
-        setTempBoxCoordinates(defaultPolygon)
-        setTempBoxText("") // Initialize with empty text
-        setTempBoxFontSize(16) // Reset to default font size
-        setTempBoxFontColor([0, 0, 0]) // Reset to default font color (black)
-        setTempBoxFontId(fonts[0]?.id || 1) // Reset to default font ID
-        setIsEditingTempBoxText(true)
+    // Reset states for existing bubbles after API call attempt or click
+    setDraggedBubble(null)
+    setDragOffset({ x: 0, y: 0 })
+    setDraggingVertexIndex(null)
+    setInitialMousePos(null)
+    setInitialVertexPos(null)
+    setInitialBubbleState(null)
 
-        const canvas = canvasRef.current
-        const image = imageRef.current
-        if (canvas && image) {
-          let minX = Number.POSITIVE_INFINITY,
-            maxX = Number.NEGATIVE_INFINITY,
-            minY = Number.POSITIVE_INFINITY,
-            maxY = Number.NEGATIVE_INFINITY
-
-          for (const point of defaultPolygon) {
-            minX = Math.min(minX, (point[0] / image.naturalWidth) * canvas.width)
-            maxX = Math.max(maxX, (point[0] / image.naturalWidth) * canvas.width)
-            minY = Math.min(minY, (point[1] / image.naturalHeight) * canvas.height)
-            maxY = Math.max(maxY, (point[1] / image.naturalHeight) * canvas.height)
-          }
-          setTempBoxEditBounds({
-            x: minX,
-            y: minY,
-            width: maxX - minX,
-            height: maxY - minY,
-          })
-        }
-        return
-      }
-    }
+    // Reset states for temporary box (these are independent of bubble drag/resize save)
+    setIsResizingTempBox(false)
+    setResizingTempBoxVertexIndex(null)
+    setIsDraggingTempBox(false)
+    setTempBoxDragOffset({ x: 0, y: 0 })
+    setInitialTempBoxMousePos(null)
+    setInitialTempBoxVertexPos(null)
+    setInitialTempBoxPolygon(null)
   }
 
   const handleRightClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -995,7 +1008,6 @@ export function CanvasOverlay({
         maxX = Number.NEGATIVE_INFINITY,
         minY = Number.POSITIVE_INFINITY,
         maxY = Number.NEGATIVE_INFINITY
-
       for (const point of tempBoxCoordinates) {
         minX = Math.min(minX, point[0])
         maxX = Math.max(maxX, point[0])
@@ -1235,8 +1247,6 @@ export function CanvasOverlay({
     editingBubble,
     draggedBubble,
     fonts,
-    isDraggingVertex,
-    isDraggingBubble,
     tempBoxCoordinates, // Added for temporary box
     isEditingTempBoxText, // Added for temporary box
     tempBoxText, // Added for temporary box text changes
@@ -1261,8 +1271,7 @@ export function CanvasOverlay({
 
   const getCursorStyle = () => {
     if (isAddingBubble) return "crosshair"
-    if (isResizingTempBox || isDraggingVertex) return "grabbing"
-    if (isDraggingTempBox || isDraggingBubble) return "grabbing"
+    if (isPotentialDrag) return "grabbing" // Show grabbing cursor if a potential drag is active
     return "pointer"
   }
 
@@ -1289,7 +1298,6 @@ export function CanvasOverlay({
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
-        onClick={handleCanvasClick}
         onContextMenu={handleRightClick}
       />
       {/* Inline Text Editing for Existing Bubbles */}
@@ -1459,7 +1467,7 @@ export function CanvasOverlay({
       )}
       {!isAddingBubble && !editingBubble && !isEditingTempBoxText && (
         <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm instruction-overlay">
-          Double-click speech bubble to edit text • Double-click empty area to add/edit New box • Drag bubbles to move
+          Click speech bubble to edit text • Double-click empty area to add/edit New box • Drag bubbles to move
         </div>
       )}
     </div>
