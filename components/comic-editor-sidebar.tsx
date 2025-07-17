@@ -22,7 +22,7 @@ import {
   Type,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+// Removed Select, SelectContent, SelectItem, SelectTrigger, SelectValue as FontPicker will handle this
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,10 @@ import {
 import jsPDF from "jspdf"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
+
+// Import Font interface and loadFont utility from lib/fonts.ts
+import { type Font, loadFont } from "@/lib/fonts"
+import { FontPicker } from "@/components/font-picker" // Import the new FontPicker component
 
 interface SpeechBubble {
   bubble_id: number
@@ -58,11 +62,7 @@ interface PageData {
   speech_bubbles: SpeechBubble[]
 }
 
-interface Font {
-  id: number
-  name: string
-  file_url?: string
-}
+// Removed local Font interface as it's now imported from lib/fonts.ts
 
 interface ComicEditorSidebarProps {
   selectedFileId: number | null
@@ -79,7 +79,7 @@ interface ComicEditorSidebarProps {
   isAddingBubble?: boolean
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
   onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
-  onBubbleClick?: (bubble: SpeechBubble) => void // Add this prop
+  onBubbleClick?: (bubble: SpeechBubble) => void
 }
 
 export function ComicEditorSidebar({
@@ -97,11 +97,11 @@ export function ComicEditorSidebar({
   isAddingBubble = false,
   onBubbleUpdate,
   onBubbleGeometrySave,
-  onBubbleClick, // Destructure the new prop
+  onBubbleClick,
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
-  const [fonts, setFonts] = useState<Font[]>([])
+  const [fonts, setFonts] = useState<Font[]>([]) // Use imported Font interface
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null)
   const [isFontDialogOpen, setIsFontDialogOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -126,6 +126,10 @@ export function ComicEditorSidebar({
     try {
       const response = await apiRequest("/v1/fonts/", {}, token!)
       setFonts(response || [])
+      // Load all fetched fonts initially using the imported loadFont utility
+      response.forEach((font: Font) => {
+        loadFont(font)
+      })
     } catch (error: any) {
       toast({
         title: "Error",
@@ -161,7 +165,7 @@ export function ComicEditorSidebar({
     } else if (!selectedFontId && fonts.length > 0) {
       setSelectedFontId(fonts[0].id)
     }
-  }, [pages, fonts])
+  }, [pages, fonts, selectedFontId])
 
   const createBubble = async () => {
     if (!selectedPageId) return
@@ -227,18 +231,15 @@ export function ComicEditorSidebar({
     translation: string,
     font_size?: number,
     font_color?: string,
-    font_id?: number, // This is the font_id being passed in
+    font_id?: number,
   ) => {
     try {
-      // Find the current bubble to get existing properties (Fix 4)
       const currentPage = pages.find((p) => p.page_id === pageId)
       const currentBubble = currentPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
-
       if (!currentBubble) {
         toast({ title: "Error", description: "Bubble not found for update.", variant: "destructive" })
         return
       }
-
       await apiRequest(
         `/v1/pages/${pageId}/bubble/${bubbleId}/translation`,
         {
@@ -249,16 +250,15 @@ export function ComicEditorSidebar({
               {
                 bubble_id: bubbleId,
                 translation,
-                font_size: font_size ?? currentBubble.font_size, // Use provided or current (Fix 4)
-                font_color: font_color ? hexToRgbArray(font_color) : currentBubble.font_color, // Use provided or current (Fix 4)
-                font_id: font_id ?? currentBubble.font_id, // Use provided or current (Fix 4)
+                font_size: font_size ?? currentBubble.font_size,
+                font_color: font_color ? hexToRgbArray(font_color) : currentBubble.font_color,
+                font_id: font_id ?? currentBubble.font_id,
               },
             ],
           }),
         },
         token!,
       )
-      // Update local state for real-time preview (Fix 4)
       if (onBubbleUpdate) {
         onBubbleUpdate(pageId, bubbleId, {
           translation,
@@ -277,26 +277,30 @@ export function ComicEditorSidebar({
     }
   }
 
-  const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number) => {
+  const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number | null) => {
     const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
     if (!bubble) return
 
+    // Find the font object to get its name and file_url
+    const selectedFont = fonts.find((f) => f.id === fontId)
+    if (selectedFont) {
+      // Only attempt to load if a font is actually selected
+      await loadFont(selectedFont) // Use the imported loadFont utility
+    }
     // Update local font mapping immediately
-    setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId }))
+    setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId || 0 })) // Store 0 or null if no font selected
     // Update local state immediately for real-time preview (font_id only)
     if (onBubbleUpdate) {
       onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
     }
-
     try {
-      // Call updateBubbleTranslation with all current bubble data and the new fontId (Fix 5 & 6)
       await updateBubbleTranslation(
         pageId,
         bubbleId,
-        bubble.translation || "", // Current translation
-        bubble.font_size || 14, // Current font size
-        bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000", // Current font color
-        fontId, // The new fontId
+        bubble.translation || "",
+        bubble.font_size || 14,
+        bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
+        fontId || 1, // Pass the selected fontId, default to 1 if null
       )
       toast({ title: "Success", description: "Font updated" })
     } catch (error: any) {
@@ -321,26 +325,23 @@ export function ComicEditorSidebar({
       onBubbleUpdate(pageId, bubbleId, { text })
     }
     try {
-      // Find the current bubble to get existing properties (Fix 4)
       const currentPage = pages.find((p) => p.page_id === pageId)
       const currentBubble = currentPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
       if (!currentBubble) {
         toast({ title: "Error", description: "Bubble not found for update.", variant: "destructive" })
         return
       }
-
       await apiRequest(
         `/v1/pages/${pageId}/bubble/${bubbleId}/text?text=${encodeURIComponent(text)}`,
         {
           method: "PUT",
           body: JSON.stringify({
-            // Include other properties to prevent loss (Fix 4)
             bubble_id: bubbleId,
             text,
             translation: currentBubble.translation,
             font_size: currentBubble.font_size,
             font_color: currentBubble.font_color,
-            font_id: currentBubble.font_id,
+            font_id: currentBubble.font_id, // Ensure font_id is sent back
           }),
         },
         token!,
@@ -374,7 +375,6 @@ export function ComicEditorSidebar({
   }
 
   const handlePolygonSelect = (coordinates: number[][]) => {
-    // Calculate bounding box from polygon
     let minX = Number.POSITIVE_INFINITY,
       maxX = Number.NEGATIVE_INFINITY,
       minY = Number.POSITIVE_INFINITY,
@@ -395,14 +395,11 @@ export function ComicEditorSidebar({
   const captureCanvasElementClean = async (
     element: HTMLElement,
   ): Promise<{ dataUrl: string; originalWidth: number; originalHeight: number }> => {
-    // Find the canvas element within the container
     const canvasElement = element.querySelector("canvas") as HTMLCanvasElement
     const imageElement = element.querySelector("img") as HTMLImageElement
     if (!canvasElement || !imageElement) {
       throw new Error("Canvas or image element not found")
     }
-
-    // Get the export canvas without UI elements
     const exportCanvasResult = (canvasElement as any).getExportCanvas?.()
     if (!exportCanvasResult) {
       throw new Error("Export canvas not available")
@@ -410,23 +407,15 @@ export function ComicEditorSidebar({
     const exportCanvas = exportCanvasResult.canvas
     const originalWidth = exportCanvasResult.originalWidth
     const originalHeight = exportCanvasResult.originalHeight
-
-    // Create a composite canvas with the image and clean bubbles
     const compositeCanvas = document.createElement("canvas")
     const ctx = compositeCanvas.getContext("2d")
     if (!ctx) {
       throw new Error("Could not get canvas context")
     }
-
-    // Set canvas size to match the export canvas
     compositeCanvas.width = exportCanvas.width
     compositeCanvas.height = exportCanvas.height
-
-    // Draw the original image first
     ctx.drawImage(imageElement, 0, 0, compositeCanvas.width, compositeCanvas.height)
-    // Draw the clean bubbles on top
     ctx.drawImage(exportCanvas, 0, 0)
-
     return { dataUrl: compositeCanvas.toDataURL("image/png"), originalWidth, originalHeight }
   }
 
@@ -439,12 +428,9 @@ export function ComicEditorSidebar({
       })
       return
     }
-
     setIsExporting(true)
     try {
       const sortedPages = pages.sort((a, b) => a.page_number - b.page_number)
-
-      // Find the first page's canvas to get original dimensions for PDF
       const firstPage = sortedPages[0]
       const canvasElements = document.querySelectorAll(`[data-page-id="${firstPage.page_id}"]`)
       let firstCanvasElement: HTMLElement | null = null
@@ -455,7 +441,6 @@ export function ComicEditorSidebar({
           break
         }
       }
-
       if (!firstCanvasElement) {
         toast({
           title: "Error",
@@ -465,16 +450,11 @@ export function ComicEditorSidebar({
         setIsExporting(false)
         return
       }
-
       const { originalWidth, originalHeight } = await captureCanvasElementClean(firstCanvasElement)
-
-      // Fix 7: Initialize jsPDF with custom page size matching image dimensions, no margins
       const orientation = originalWidth > originalHeight ? "l" : "p"
-      const pdf = new jsPDF(orientation, "pt", [originalWidth, originalHeight]) // Use "pt" (points) and exact dimensions
-
+      const pdf = new jsPDF(orientation, "pt", [originalWidth, originalHeight])
       for (let i = 0; i < sortedPages.length; i++) {
         const page = sortedPages[i]
-        // Find the canvas overlay element for this page
         const pageCanvasElements = document.querySelectorAll(`[data-page-id="${page.page_id}"]`)
         let pageCanvasElement: HTMLElement | null = null
         for (const element of pageCanvasElements) {
@@ -484,21 +464,14 @@ export function ComicEditorSidebar({
             break
           }
         }
-
         if (pageCanvasElement) {
-          // Capture the canvas with clean bubbles (no borders) and original dimensions
           const { dataUrl } = await captureCanvasElementClean(pageCanvasElement)
-
           if (i > 0) {
-            pdf.addPage([originalWidth, originalHeight]) // Add new page with the same custom dimensions
+            pdf.addPage([originalWidth, originalHeight])
           }
-
-          // Draw the image at (0,0) to remove all padding/margins (Fix 7)
           pdf.addImage(dataUrl, "PNG", 0, 0, originalWidth, originalHeight)
-
-          // Add page number (optional, adjust positioning if needed without margins)
           pdf.setFontSize(10)
-          const marginPt = 10 // Use points consistent with PDF unit
+          const marginPt = 10
           pdf.text(`Page ${page.page_number}`, marginPt, originalHeight - marginPt)
         }
       }
@@ -527,14 +500,11 @@ export function ComicEditorSidebar({
       })
       return
     }
-
     setIsExporting(true)
     try {
       const zip = new JSZip()
       const sortedPages = pages.sort((a, b) => a.page_number - b.page_number)
-
       for (const page of sortedPages) {
-        // Find the canvas overlay element for this page
         const canvasElements = document.querySelectorAll(`[data-page-id="${page.page_id}"]`)
         let canvasElement: HTMLElement | null = null
         for (const element of canvasElements) {
@@ -544,21 +514,13 @@ export function ComicEditorSidebar({
             break
           }
         }
-
         if (canvasElement) {
-          // Capture the canvas with clean bubbles (no borders)
           const { dataUrl } = await captureCanvasElementClean(canvasElement)
-
-          // Convert data URL to blob
           const response = await fetch(dataUrl)
           const blob = await response.blob()
-
-          // Add to zip
           zip.file(`page-${page.page_number.toString().padStart(3, "0")}.png`, blob)
         }
       }
-
-      // Generate and download zip
       const zipBlob = await zip.generateAsync({ type: "blob" })
       saveAs(zipBlob, `comic-file-${selectedFileId}-translated-images.zip`)
       toast({
@@ -585,10 +547,8 @@ export function ComicEditorSidebar({
       })
       return
     }
-
     setIsExporting(true)
     try {
-      // Find the canvas overlay element for the current page
       const canvasElements = document.querySelectorAll(`[data-page-id="${selectedPageId}"]`)
       let canvasElement: HTMLElement | null = null
       for (const element of canvasElements) {
@@ -598,12 +558,8 @@ export function ComicEditorSidebar({
           break
         }
       }
-
       if (canvasElement) {
-        // Capture the canvas with clean bubbles (no borders)
         const { dataUrl } = await captureCanvasElementClean(canvasElement)
-
-        // Create download link
         const link = document.createElement("a")
         link.download = `comic-page-${selectedPage.page_number}.png`
         link.href = dataUrl
@@ -624,9 +580,10 @@ export function ComicEditorSidebar({
     }
   }
 
-  const getFontName = (fontId: number) => {
+  const getFontName = (fontId: number | null | undefined) => {
+    if (fontId === null || fontId === undefined) return "sans-serif" // Default fallback
     const font = fonts.find((f) => f.id === fontId)
-    return font ? font.name : "Default Font"
+    return font ? font.name : "sans-serif" // Fallback to a generic font
   }
 
   return (
@@ -777,7 +734,7 @@ export function ComicEditorSidebar({
                       className={`border rounded-lg p-3 cursor-pointer ${
                         selectedBubbleId === bubble.bubble_id ? "border-red-500 bg-red-50" : ""
                       }`}
-                      onClick={() => onBubbleClick?.(bubble)} // Directly call onBubbleClick
+                      onClick={() => onBubbleClick?.(bubble)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <Badge variant="secondary">
@@ -804,7 +761,6 @@ export function ComicEditorSidebar({
                           className="text-sm"
                           value={bubble.text}
                           onChange={(e) => {
-                            // Update local state immediately
                             if (onBubbleUpdate) {
                               onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
                                 text: e.target.value,
@@ -818,7 +774,6 @@ export function ComicEditorSidebar({
                           className="text-sm"
                           value={bubble.translation || ""}
                           onChange={(e) => {
-                            // Update local state immediately
                             if (onBubbleUpdate) {
                               onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
                                 translation: e.target.value,
@@ -829,53 +784,17 @@ export function ComicEditorSidebar({
                             updateBubbleTranslation(selectedPage.page_id, bubble.bubble_id, e.target.value)
                           }
                         />
-                        {/* Font Family Selection */}
+                        {/* Font Family Selection using FontPicker */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
                             <Type className="h-3 w-3" />
                             <Label className="text-xs">Choose Font Family</Label>
                           </div>
-                          <Select
-                            value={
-                              bubbleFonts[bubble.bubble_id]?.toString() ||
-                              bubble.font_id?.toString() ||
-                              selectedFontId?.toString() ||
-                              ""
-                            }
-                            onValueChange={(value) => {
-                              const fontId = Number(value)
-                              // Update local state immediately for real-time preview
-                              if (onBubbleUpdate) {
-                                onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, { font_id: fontId })
-                              }
-                              // Update the bubble font (Fix 5 & 6)
-                              updateBubbleFont(selectedPage.page_id, bubble.bubble_id, fontId)
-                            }}
-                          >
-                            <SelectTrigger className="text-xs">
-                              <SelectValue placeholder="Select font">
-                                {bubbleFonts[bubble.bubble_id]
-                                  ? getFontName(bubbleFonts[bubble.bubble_id])
-                                  : bubble.font_id
-                                    ? getFontName(bubble.font_id)
-                                    : selectedFontId
-                                      ? getFontName(selectedFontId)
-                                      : "Select font"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {fonts.map((font) => (
-                                <SelectItem key={font.id} value={font.id.toString()}>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{font.name}</span>
-                                    {font.file_url && (
-                                      <span className="text-xs text-muted-foreground">Custom Font</span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FontPicker
+                            options={fonts}
+                            value={bubbleFonts[bubble.bubble_id] ?? bubble.font_id}
+                            onChange={(fontId) => updateBubbleFont(selectedPage.page_id, bubble.bubble_id, fontId)}
+                          />
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="flex flex-col w-1/2">
@@ -883,10 +802,9 @@ export function ComicEditorSidebar({
                             <input
                               type="number"
                               className="border rounded px-2 py-1 text-sm"
-                              value={bubble.font_size ?? ""} // Fix 3: Handle null/undefined for empty input
+                              value={bubble.font_size ?? ""}
                               onChange={(e) => {
-                                const fontSize = e.target.value === "" ? null : Number(e.target.value) // Fix 3: Allow null
-                                // Update local state immediately
+                                const fontSize = e.target.value === "" ? null : Number(e.target.value)
                                 if (onBubbleUpdate) {
                                   onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
                                     font_size: fontSize,
@@ -898,7 +816,7 @@ export function ComicEditorSidebar({
                                   selectedPage.page_id,
                                   bubble.bubble_id,
                                   bubble.translation || "",
-                                  e.target.value === "" ? undefined : Number(e.target.value), // Fix 3: Pass undefined if empty for API
+                                  e.target.value === "" ? undefined : Number(e.target.value),
                                   bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
                                   bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? selectedFontId ?? 1,
                                 )
@@ -912,7 +830,6 @@ export function ComicEditorSidebar({
                               className="h-9 rounded"
                               value={bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000"}
                               onChange={(e) => {
-                                // Update local state immediately
                                 if (onBubbleUpdate) {
                                   onBubbleUpdate(selectedPage.page_id, bubble.bubble_id, {
                                     font_color: hexToRgbArray(e.target.value),
@@ -924,7 +841,7 @@ export function ComicEditorSidebar({
                                   selectedPage.page_id,
                                   bubble.bubble_id,
                                   bubble.translation || "",
-                                  bubble.font_size || 14, // Default to 14 (Fix 4)
+                                  bubble.font_size || 14,
                                   e.target.value,
                                   bubbleFonts[bubble.bubble_id] ?? bubble.font_id ?? selectedFontId ?? 1,
                                 )
@@ -1020,33 +937,16 @@ export function ComicEditorSidebar({
                               <Type className="h-3 w-3" />
                               <Label className="text-xs">Choose Font Family</Label>
                             </div>
-                            <Select
-                              value={newBubbleData.font_id.toString()}
-                              onValueChange={(value) =>
+                            <FontPicker
+                              options={fonts}
+                              value={newBubbleData.font_id}
+                              onChange={(fontId) =>
                                 setNewBubbleData((prev) => ({
                                   ...prev,
-                                  font_id: Number(value),
+                                  font_id: fontId || 1, // Default to 1 if null
                                 }))
                               }
-                            >
-                              <SelectTrigger className="text-xs">
-                                <SelectValue placeholder="Select font">
-                                  {getFontName(newBubbleData.font_id)}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {fonts.map((font) => (
-                                  <SelectItem key={font.id} value={font.id.toString()}>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{font.name}</span>
-                                      {font.file_url && (
-                                        <span className="text-xs text-muted-foreground">Custom Font</span>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            />
                           </div>
                           <Button
                             onClick={createBubble}
