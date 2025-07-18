@@ -335,7 +335,12 @@ export function CanvasOverlay({
           fontFamily = font.name
         }
       }
-      ctx.font = `${fontSize}px ${fontFamily}`
+      ////////
+      //bug for font fixed
+     const selectedFont = fonts?.find((f) => f.id === bubble.font_id);
+    const fontName = selectedFont ? selectedFont.name : 'Arial';
+    ctx.font = `${fontSize}px "${fontName}"`;
+      ////////////
       ctx.textAlign = "center"
       ctx.textBaseline = "middle"
 
@@ -461,7 +466,7 @@ export function CanvasOverlay({
       const centerX = (minX + maxX) / 2
       const centerY = (minY + maxY) / 2
       const maxWidth = (maxX - minX) * 0.9
-      const maxHeight = (maxY - minY) * 0.9
+      const maxHeight = (maxY - minY) * 0.9  //comment it if maxheight causes prob
 
       // Apply font family if font_id is available
       let fontFamily = "Arial" // Default fallback
@@ -471,7 +476,12 @@ export function CanvasOverlay({
           fontFamily = font.name
         }
       }
-      ctx.font = `${boxFontSize * Math.min(scaleX, scaleY)}px ${fontFamily}` // Apply font size and family
+
+    //   second change 
+    const selectedFont = fonts?.find((f) => f.id === boxFontId);
+    const fontName = selectedFont ? selectedFont.name : 'Arial';
+    ctx.font = `${boxFontSize * Math.min(scaleX, scaleY)}px "${fontName}"`;
+    //////////
       ctx.textAlign = "center"
       ctx.textBaseline = "middle"
       ctx.fillStyle = `rgb(${boxFontColor[0]}, ${boxFontColor[1]}, ${boxFontColor[2]})` // Apply font color
