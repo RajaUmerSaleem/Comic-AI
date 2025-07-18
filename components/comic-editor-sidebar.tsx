@@ -80,6 +80,7 @@ interface ComicEditorSidebarProps {
   onBubbleUpdate?: (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => void
   onBubbleGeometrySave?: (pageId: number, bubbleId: number, mask_coordinates: number[][], coordinates: number[]) => void
   onBubbleClick?: (bubble: SpeechBubble) => void
+   fonts?: Array<{ id: number; name: string; file_url?: string }> 
 }
 
 export function ComicEditorSidebar({
@@ -98,10 +99,10 @@ export function ComicEditorSidebar({
   onBubbleUpdate,
   onBubbleGeometrySave,
   onBubbleClick,
+  fonts: propsFonts,
 }: ComicEditorSidebarProps) {
   const { token } = useAuth()
   const [isSinglePageTranslateDialogOpen, setIsSinglePageTranslateDialogOpen] = useState(false)
-  const [fonts, setFonts] = useState<Font[]>([]) // Use imported Font interface
   const [selectedFontId, setSelectedFontId] = useState<number | null>(null)
   const [isFontDialogOpen, setIsFontDialogOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -118,34 +119,13 @@ export function ComicEditorSidebar({
     font_id: 1, // Default font ID (assuming ID 1 exists)
   })
   const { toast } = useToast()
-
+  const fonts = propsFonts || []
   const selectedPage = pages.find((p) => p.page_id === selectedPageId)
   const selectedBubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === selectedBubbleId)
 
-  const fetchFonts = async () => {
-    try {
-      const response = await apiRequest("/v1/fonts/", {}, token!)
-      setFonts(response || [])
-      // Load all fetched fonts initially using the imported loadFont utility
-      response.forEach((font: Font) => {
-        loadFont(font)
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch fonts",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Fetch fonts on component mount
-  useEffect(() => {
-    fetchFonts()
-  }, [])
-
+ 
   // Initialize bubble fonts from page data and set default selected font
-  useEffect(() => {
+ useEffect(() => {
     const newBubbleFonts: Record<number, number> = {}
     let defaultFontId: number | null = null
     pages.forEach((page) => {
@@ -165,8 +145,7 @@ export function ComicEditorSidebar({
     } else if (!selectedFontId && fonts.length > 0) {
       setSelectedFontId(fonts[0].id)
     }
-  }, [pages, fonts, selectedFontId])
-
+  }, [pages, fonts, selectedFontId]) 
   const createBubble = async () => {
     if (!selectedPageId) return
     try {
@@ -277,40 +256,58 @@ export function ComicEditorSidebar({
     }
   }
 
-  const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number | null) => {
-    const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
-    if (!bubble) return
+ const updateBubbleFont = async (pageId: number, bubbleId: number, fontId: number | null) => {
+  const bubble = selectedPage?.speech_bubbles.find((b) => b.bubble_id === bubbleId)
+  if (!bubble) return
 
-    // Find the font object to get its name and file_url
-    const selectedFont = fonts.find((f) => f.id === fontId)
-    if (selectedFont) {
-      // Only attempt to load if a font is actually selected
-      await loadFont(selectedFont) // Use the imported loadFont utility
-    }
-    // Update local font mapping immediately
-    setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId || 0 })) // Store 0 or null if no font selected
-    // Update local state immediately for real-time preview (font_id only)
-    if (onBubbleUpdate) {
-      onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
-    }
+  // Find the font object to get its name and file_url
+  const selectedFont = fonts.find((f) => f.id === fontId)
+  
+  // Update local font mapping immediately for UI feedback
+  setBubbleFonts((prev) => ({ ...prev, [bubbleId]: fontId || 0 }))
+  
+  // Update local state immediately for real-time preview
+  if (onBubbleUpdate) {
+    onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
+  }
+
+  // Load font if it exists and has a file_url
+  if (selectedFont && selectedFont.file_url) {
     try {
-      await updateBubbleTranslation(
-        pageId,
-        bubbleId,
-        bubble.translation || "",
-        bubble.font_size || 14,
-        bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
-        fontId || 1, // Pass the selected fontId, default to 1 if null
-      )
-      toast({ title: "Success", description: "Font updated" })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+      await loadFont({
+        name: selectedFont.name,
+        file_url: selectedFont.file_url,
+        id: 0
       })
+      // Force another update after font is loaded
+      setTimeout(() => {
+        if (onBubbleUpdate) {
+          onBubbleUpdate(pageId, bubbleId, { font_id: fontId })
+        }
+      }, 100)
+    } catch (error) {
+      console.warn('Font loading failed:', error)
     }
   }
+
+  try {
+    await updateBubbleTranslation(
+      pageId,
+      bubbleId,
+      bubble.translation || "",
+      bubble.font_size || 14,
+      bubble.font_color ? rgbArrayToHex(bubble.font_color) : "#000000",
+      fontId || 1,
+    )
+    toast({ title: "Success", description: "Font updated" })
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message,
+      variant: "destructive",
+    })
+  }
+}
 
   function hexToRgbArray(hex: string): [number, number, number] {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
@@ -791,7 +788,7 @@ export function ComicEditorSidebar({
                             <Label className="text-xs">Choose Font Family</Label>
                           </div>
                           <FontPicker
-                            options={fonts}
+                            options={fonts.filter((font): font is Font => typeof font.file_url === 'string')}
                             value={bubbleFonts[bubble.bubble_id] ?? bubble.font_id}
                             onChange={(fontId) => updateBubbleFont(selectedPage.page_id, bubble.bubble_id, fontId)}
                           />
@@ -938,7 +935,7 @@ export function ComicEditorSidebar({
                               <Label className="text-xs">Choose Font Family</Label>
                             </div>
                             <FontPicker
-                              options={fonts}
+                              options={fonts.filter((font): font is Font => typeof font.file_url === 'string')}
                               value={newBubbleData.font_id}
                               onChange={(fontId) =>
                                 setNewBubbleData((prev) => ({

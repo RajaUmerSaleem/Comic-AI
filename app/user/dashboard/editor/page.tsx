@@ -67,7 +67,7 @@ export default function EditorPage() {
   const { toast } = useToast()
   const [isAddingBubble, setIsAddingBubble] = useState(false)
   const [fonts, setFonts] = useState<Array<{ id: number; name: string; file_url?: string }>>([])
-
+  const [canvasKey, setCanvasKey] = useState(0) // Add this line
   useEffect(() => {
     fetchFiles()
   }, [])
@@ -166,6 +166,30 @@ export default function EditorPage() {
       setIsLoading(false)
     }
   }
+
+
+const updatePageBubbleLocally = (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => {
+  setPages((prevPages) =>
+    prevPages.map((page) =>
+      page.page_id === pageId
+        ? {
+          ...page,
+          speech_bubbles: page.speech_bubbles.map((bubble) =>
+            bubble.bubble_id === bubbleId ? { ...bubble, ...updates } : bubble,
+          ),
+        }
+        : page,
+    ),
+  )
+
+  // Force a re-render of canvas overlay when font changes
+  if (updates.font_id !== undefined) {
+    // Increment canvasKey to force re-render
+    setTimeout(() => {
+      setCanvasKey(prev => prev + 1)
+    }, 200)
+  }
+}
 
   const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -467,20 +491,7 @@ export default function EditorPage() {
     }
   }
 
-  const updatePageBubbleLocally = (pageId: number, bubbleId: number, updates: Partial<SpeechBubble>) => {
-    setPages((prevPages) =>
-      prevPages.map((page) =>
-        page.page_id === pageId
-          ? {
-              ...page,
-              speech_bubbles: page.speech_bubbles.map((bubble) =>
-                bubble.bubble_id === bubbleId ? { ...bubble, ...updates } : bubble,
-              ),
-            }
-          : page,
-      ),
-    )
-  }
+
 
   const saveBubbleGeometryToBackend = async (pageId: number, bubble: SpeechBubble) => {
     if (!token) {
@@ -578,11 +589,10 @@ export default function EditorPage() {
       </Card>
       {selectedFileId && pages.length > 0 && (
         <div
-          className={`${
-            isMaximized
+          className={`${isMaximized
               ? "fixed top-0 left-0 w-screen h-screen bg-white z-50 overflow-hidden grid grid-cols-4 gap-0"
               : "grid grid-cols-1 lg:grid-cols-4 p-4 gap-8"
-          }`}
+            }`}
         >
           <div className="lg:col-span-3">
             <Card>
@@ -676,6 +686,7 @@ export default function EditorPage() {
                                     </div>
                                     {section.selectedState === "text_translated" ? (
                                       <CanvasOverlay
+                                        key={`${canvasKey}-${page.page_id}`} // Add this line
                                         imageUrl={imageUrl || page.page_image_url}
                                         speechBubbles={page.speech_bubbles}
                                         pageId={page.page_id}
@@ -685,7 +696,13 @@ export default function EditorPage() {
                                         onPolygonSelect={handlePolygonSelect}
                                         onBubbleTextUpdate={handleBubbleTextUpdate}
                                         onCanvasDoubleClick={handleCanvasDoubleClick}
-                                        onBubbleUpdate={updatePageBubbleLocally}
+                                        onBubbleUpdate={(pageId, bubbleId, updates) => {
+                                          updatePageBubbleLocally(pageId, bubbleId, updates)
+                                          // Force canvas re-render when font changes
+                                          if (updates.font_id !== undefined) {
+                                            setCanvasKey(prev => prev + 1)
+                                          }
+                                        }}
                                         onBubbleGeometrySave={saveBubbleGeometryToBackend}
                                         fonts={fonts}
                                       />
@@ -734,6 +751,7 @@ export default function EditorPage() {
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
                     onBubbleClick={handleBubbleClick}
+                    fonts={fonts}
                   />
                 </TabsContent>
                 <TabsContent value="bubbles">
@@ -752,6 +770,7 @@ export default function EditorPage() {
                     isAddingBubble={isAddingBubble}
                     onBubbleUpdate={updatePageBubbleLocally}
                     onBubbleClick={handleBubbleClick}
+                    fonts={fonts}
                   />
                 </TabsContent>
               </Tabs>

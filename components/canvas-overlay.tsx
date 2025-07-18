@@ -183,7 +183,32 @@ export function CanvasOverlay({
       throw error
     }
   }
+// Add this useEffect after other useEffects:
 
+useEffect(() => {
+  // Load all fonts when component mounts or fonts change
+  const loadFonts = async () => {
+    for (const font of fonts) {
+      if (font.file_url) {
+        try {
+          const fontFace = new FontFace(font.name, `url(${font.file_url})`)
+          await fontFace.load()
+          document.fonts.add(fontFace)
+        } catch (error) {
+          console.warn(`Failed to load font ${font.name}:`, error)
+        }
+      }
+    }
+    // Force redraw after all fonts are loaded
+    setTimeout(() => {
+      redrawCanvas()
+    }, 100)
+  }
+
+  if (fonts.length > 0) {
+    loadFonts()
+  }
+}, [fonts])
   // API function to update speech bubble
   const updateSpeechBubble = async (
     bubbleId: number,
@@ -478,9 +503,30 @@ export function CanvasOverlay({
       }
 
     //   second change 
-    const selectedFont = fonts?.find((f) => f.id === boxFontId);
-    const fontName = selectedFont ? selectedFont.name : 'Arial';
-    ctx.font = `${boxFontSize * Math.min(scaleX, scaleY)}px "${fontName}"`;
+let fontName = "Arial"
+if (boxFontId && availableFonts && availableFonts.length > 0) {
+  const selectedFont = availableFonts.find((f) => f.id === boxFontId)
+  if (selectedFont) {
+    fontName = selectedFont.name
+    
+    // Load the font if it has a file_url
+    if (selectedFont.file_url) {
+      try {
+        const fontFace = new FontFace(selectedFont.name, `url(${selectedFont.file_url})`)
+        fontFace.load().then(() => {
+          document.fonts.add(fontFace)
+        }).catch((error) => {
+          console.warn('Font loading failed:', error)
+        })
+      } catch (error) {
+        console.warn('Font loading failed:', error)
+      }
+    }
+  }
+}
+
+const fontSize = boxFontSize * Math.min(scaleX, scaleY)
+ctx.font = `${fontSize}px "${fontName}", Arial, sans-serif`
     //////////
       ctx.textAlign = "center"
       ctx.textBaseline = "middle"
